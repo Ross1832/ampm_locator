@@ -14,7 +14,7 @@ from .views import (
 )
 
 urlpatterns = [
-    path("/", set_item, name="set_item"),
+    path("", set_item, name="set_item"),
     path("select-model/", select_model, name="select-model"),
     path("fetch-model-numbers/", fetch_model_numbers, name="fetch-model-numbers"),
     path("finalize-items/", finalize_items, name="finalize-items"),
