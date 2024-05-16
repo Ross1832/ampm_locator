@@ -1,0 +1,171 @@
+{% extends 'locator/base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Select the item</h2>
+    <form id="productForm">
+        <div class="form-group">
+            <label for="model_prefix">Model:</label>
+            <select class="form-control" id="model_prefix" name="model_prefix">
+                <option value="">Choose the model</option>
+                <option value="FTA">FTA</option>
+                <option value="FBA">FBA</option>
+                <option value="FXA">FXA</option>
+                <option value="FGA">FGA</option>
+                <option value="FNA">FNA</option>
+                <option value="AIB">AIB</option>
+                <option value="AGA">AGA</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="number">Number of the model:</label>
+            <select class="form-control" id="number" name="number">
+                <option value="">First choose the model</option>
+            </select>
+        </div>
+        <button type="button" id="addItem" class="btn btn-primary">Add Item</button>
+    </form>
+    <div id="itemList" class="mt-4">
+        <h4>List of Items::</h4>
+        <ul id="itemDisplay" class="list-group"></ul>
+    </div>
+    <button type="button" id="finalizeList" class="btn btn-success mt-3">Collect</button>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const modelPrefixSelect = document.getElementById('model_prefix');
+    const itemList = document.getElementById('itemDisplay');
+    const items = {};
+
+    modelPrefixSelect.addEventListener('change', function () {
+    const prefix = this.value;
+    fetch(`/fetch-model-numbers/?model_prefix=${prefix}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            const numberSelect = document.getElementById('number');
+            numberSelect.innerHTML = '<option value="">Chose the number</option>';
+            data.numbers.forEach(function (number) {
+                const option = new Option(number, number);
+                numberSelect.add(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error while retrieving model numbers: ' + error.message);
+        });
+});
+
+document.getElementById('addItem').addEventListener('click', function () {
+    const prefix = modelPrefixSelect.value;
+    const number = document.getElementById('number').value;
+    const itemKey = `${prefix}${number}`;
+    if (itemKey) {
+        items[itemKey] = (items[itemKey] || 0) + 1;
+        updateDisplay();
+    }
+});
+
+
+    document.getElementById('finalizeList').addEventListener('click', function () {
+    const jsonData = JSON.stringify({ items: items });
+    console.log("Sending data to server:", jsonData);
+    fetch(`/finalize-items/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: jsonData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok ' + response.statusText);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log("Data received from server:", data);
+        if (data.items) {
+            displayFinalizedList(data.items);
+        } else {
+            console.error("No items to display", data);
+        }
+    })
+    .catch(error => console.log('Error during fetch:', error));
+});
+
+
+    function updateDisplay() {
+        itemList.innerHTML = '';
+        Object.keys(items).forEach(key => {
+            const listItem = document.createElement('li');
+            listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+            listItem.textContent = `${key} - Quantity: ${items[key]}`;
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.className = 'btn btn-danger btn-sm';
+            deleteButton.onclick = function() {
+                delete items[key];
+                updateDisplay();
+            };
+
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Change';
+            editButton.className = 'btn btn-secondary btn-sm';
+            editButton.onclick = function() {
+                const newQuantity = prompt('Enter the new quantity:', items[key]);
+                if (newQuantity && !isNaN(newQuantity)) {
+                    items[key] = parseInt(newQuantity);
+                    updateDisplay();
+                }
+            };
+
+            listItem.appendChild(editButton);
+            listItem.appendChild(deleteButton);
+            itemList.appendChild(listItem);
+        });
+    }
+
+        function displayFinalizedList(items) {
+        const container = document.querySelector('.container');
+        const existingTable = document.getElementById('finalizedTable');
+        if (existingTable) {
+            existingTable.remove();
+        }
+
+        const finalizedTable = document.createElement('table');
+        finalizedTable.className = 'table table-striped';
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        ["Article", "Quantity", "Row", "Line"].forEach(text => {
+            const headerCell = document.createElement('th');
+            headerCell.textContent = text;
+            headerRow.appendChild(headerCell);
+        });
+        thead.appendChild(headerRow);
+        finalizedTable.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        items.forEach(item => {
+            const row = document.createElement('tr');
+            ['model', 'quantity', 'line', 'place'].forEach(key => {
+                const cell = document.createElement('td');
+                cell.textContent = item[key];
+                row.appendChild(cell);
+            });
+            tbody.appendChild(row);
+        });
+        finalizedTable.appendChild(tbody);
+
+        container.appendChild(finalizedTable);
+        finalizedTable.id = 'finalizedTable';
+    }
+});
+</script>
+{% endblock %}

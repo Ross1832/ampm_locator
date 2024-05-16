@@ -1,0 +1,73 @@
+{% extends 'locator/base.html' %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Item Locator</h1>
+    <form method="post" class="mb-4">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="id_model_prefix">Model Prefix:</label>
+            <select class="form-control" name="model_prefix" id="id_model_prefix" onchange="fetchNumbers(this.value);">
+                {% for choice in form.model_prefix.field.choices %}
+                    <option value="{{ choice.0 }}">{{ choice.1 }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="id_number">Number:</label>
+            <select class="form-control" name="number" id="id_number" required>
+                <!-- Numbers will be added here by JavaScript based on the model prefix -->
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="id_line">Line:</label>
+            <input type="number" class="form-control" name="line" id="id_line" required>
+        </div>
+        <div class="form-group">
+            <label for="id_place">Place:</label>
+            <input type="number" class="form-control" name="place" id="id_place" required>
+        </div>
+        <button type="submit" class="btn btn-success">Add/Update Item</button>
+    </form>
+    {% if errors %}
+        <div class="alert alert-danger">{{ errors }}</div>
+    {% endif %}
+    <table class="table table-bordered">
+        <thead class="thead-dark">
+            <tr>
+                <th>Model Prefix</th>
+                <th>Number</th>
+                <th>Line</th>
+                <th>Place</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+                <tr>
+                    <td>{{ item.model_prefix }}</td>
+                    <td>{{ item.number }}</td>
+                    <td>{{ item.line }}</td>
+                    <td>{{ item.place }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<script>
+function fetchNumbers(prefix) {
+    const url = `/fetch-model-numbers/?model_prefix=${prefix}`;
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('id_number');
+            select.innerHTML = ''; // Clear existing options
+            data.numbers.forEach(number => {
+                const option = document.createElement('option');
+                option.value = number;
+                option.text = number;
+                select.appendChild(option);
+            });
+        }).catch(error => console.error('Error fetching numbers:', error));
+}
+</script>
+{% endblock %}

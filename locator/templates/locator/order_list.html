@@ -1,0 +1,202 @@
+{% extends 'locator/base.html' %}
+{% load custom_filters %}
+
+{% block content %}
+
+<div class="container mt-3">
+    <h2>Order List</h2>
+    <form method="get" action="">
+        <div class="row mb-3">
+            <div class="col">
+                <input type="text" name="search" class="form-control" placeholder="Search by Customer Name or Order Number" value="{{ request.GET.search }}">
+            </div>
+            <div class="col">
+                <select name="store" class="form-control">
+    <option value="">Filter by Store</option>
+    {% for store_name in distinct_stores %}
+    <option value="{{ store_name }}" {% if request.GET.store == store_name %}selected{% endif %}>
+        {{ store_name }}
+    </option>
+    {% empty %}
+    <option disabled>No stores available</option>
+    {% endfor %}
+</select>
+            </div>
+            <div class="col">
+                <select name="status" class="form-control">
+                    <option value="">Filter by Status</option>
+                    {% for status in distinct_statuses %}
+                    <option value="{{ status }}" {% if request.GET.status == status %}selected{% endif %}>
+                        {{ status|get_status_display:status_descriptions }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col">
+                <button type="submit" class="btn btn-primary">Search</button>
+            </div>
+        </div>
+    </form>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Store Name</th>
+                <th>Date</th>
+                <th>Order Number</th>
+                <th>Customer Name</th>
+                <th>Items</th>
+                <th>Quantities</th>
+                <th>Status</th>
+                <th>Notes</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.store_name }}</td>
+                <td>{{ order.date }}</td>
+                <td>{{ order.order_number }}</td>
+                <td>{{ order.customer_name }}</td>
+                <td>
+                    {% for item in order.items_with_quantities %}
+                        {{ item.model_prefix }}{{ item.number }}<br>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for item in order.items_with_quantities %}
+                        {{ item.total_quantity }}<br>
+                    {% endfor %}
+                </td>
+                <td>{{ order.get_status_display }}</td>
+                <td>{{ order.notes }}</td>
+                <td>
+        {% if order.status == 'COM' %}
+        <button class="btn btn-info" onclick="updateOrderStatus({{ order.id }}, 'INP')">Incomplete</button>
+        {% else %}
+        <button class="btn btn-success" onclick="updateOrderStatus({{ order.id }}, 'COM')">Complete</button>
+        {% endif %}
+        <button class="btn btn-warning" data-toggle="modal" data-target="#holdModal{{ order.id }}">Hold</button>
+    </td>
+
+            </tr>
+            <!-- Modal for Hold Action -->
+            <div class="modal fade" id="holdModal{{ order.id }}" tabindex="-1" role="dialog" aria-labelledby="holdModalLabel{{ order.id }}" aria-hidden="true">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="holdModalLabel{{ order.id }}">Why is this order on hold?</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="holdForm{{ order.id }}">
+                                <div class="form-group">
+                                    <label for="note{{ order.id }}">Note:</label>
+                                    <textarea class="form-control" id="note{{ order.id }}" required></textarea>
+                                </div>
+                                <button type="button" class="btn btn-primary" onclick="submitHold({{ order.id }})">Submit</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="button" id="collectItems" class="btn btn-primary mt-3">Collect Items</button>
+    <div id="itemList" class="mt-4">
+    <h4>Aggregated Items:</h4>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Model</th>
+                <th>Quantity</th>
+                <th>Line</th>
+                <th>Place</th>
+            </tr>
+        </thead>
+        <tbody id="itemDisplay"></tbody>
+    </table>
+</div>
+</div>
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById('collectItems').addEventListener('click', function () {
+    const store = document.querySelector('[name="store"]').value;
+    const status = document.querySelector('[name="status"]').value;
+    const search = document.querySelector('[name="search"]').value;
+
+    const queryParams = new URLSearchParams({store, status, search}).toString();
+
+    fetch(`/collect-items/?${queryParams}`)
+    .then(response => response.json())
+    .then(data => {
+        displayItems(data.items);
+    })
+    .catch(error => {
+        console.error('Error fetching items:', error);
+        alert('Error fetching items: ' + error.message);
+    });
+})
+
+    function displayItems(items) {
+    const itemList = document.getElementById('itemDisplay');
+    itemList.innerHTML = ''; // Clear previous items
+    items.forEach(item => {
+        const row = document.createElement('tr');
+
+        const modelCell = document.createElement('td');
+        modelCell.textContent = item.model;
+        row.appendChild(modelCell);
+
+        const quantityCell = document.createElement('td');
+        quantityCell.textContent = `${item.quantity}`;
+        row.appendChild(quantityCell);
+
+        const lineCell = document.createElement('td');
+        lineCell.textContent = item.line;
+        row.appendChild(lineCell);
+
+        const placeCell = document.createElement('td');
+        placeCell.textContent = item.place;
+        row.appendChild(placeCell);
+
+        itemList.appendChild(row);
+    });
+}
+});
+function updateOrderStatus(orderId, newStatus) {
+    const note = newStatus === 'ONH' ? $('#note' + orderId).val() : '';
+    $.post({
+        url: '/update-order-status/',
+        data: {
+            'order_id': orderId,
+            'status': newStatus,
+            'note': note,
+            'csrfmiddlewaretoken': $('input[name="csrfmiddlewaretoken"]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("Error in AJAX request:", status, error);
+        }
+    });
+}
+
+function submitHold(orderId) {
+    console.log("Submitting hold for order:", orderId);
+    updateOrderStatus(orderId, 'ONH');
+    $('#holdModal' + orderId).modal('hide');
+}
+</script>
+{% endblock %}

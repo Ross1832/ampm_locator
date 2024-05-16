@@ -1,0 +1,99 @@
+{% extends "locator/base.html" %}
+
+{% block title %}Useful Information{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <h1 class="mb-4 text-primary text-center">Useful Information</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-8 mx-auto">
+            <input type="text" id="search-bar" class="form-control" placeholder="Search for information...">
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4 mx-auto">
+            <select id="sort-options" class="form-control">
+                <option value="title">Sort by Title</option>
+                <option value="date">Sort by Date</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="loading-indicator" class="text-center" style="display: none;">
+        <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+    </div>
+
+    <div class="row" id="info-grid">
+        {% for info in infos %}
+            <div class="col-md-6 mb-4 info-item">
+                <div class="card h-100 shadow">
+                    {% if info.image %}
+                        <img src="{{ info.image.url }}" alt="{{ info.title }}" class="card-img-top" style="max-height: 200px; object-fit: cover;">
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title text-info">{{ info.title }}</h5>
+                        <p class="card-text">{{ info.description }}</p>
+                    </div>
+                    <div class="card-footer">
+                        <small class="text-muted">Last updated: {{ info.updated_at }}</small>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            <li class="page-item"><a class="page-link" href="#" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a></li>
+            {% for page_num in page_numbers %}
+                <li class="page-item"><a class="page-link" href="#">{{ page_num }}</a></li>
+            {% endfor %}
+            <li class="page-item"><a class="page-link" href="#" aria-label="Next"><span aria-hidden="true">&raquo;</span></a></li>
+        </ul>
+    </nav>
+</div>
+
+<script>
+
+document.addEventListener('DOMContentLoaded', function () {
+    const searchBar = document.getElementById('search-bar');
+    const sortOptions = document.getElementById('sort-options');
+    const infoGrid = document.getElementById('info-grid');
+    const loadingIndicator = document.getElementById('loading-indicator');
+
+    function filterAndSortInfos() {
+        loadingIndicator.style.display = 'block';
+        const searchTerm = searchBar.value.toLowerCase();
+        const sortOption = sortOptions.value;
+
+        let filteredInfos = Array.from(infoGrid.getElementsByClassName('info-item'));
+
+        filteredInfos.forEach(item => {
+            const title = item.querySelector('.card-title').textContent.toLowerCase();
+            if (title.includes(searchTerm)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+
+        filteredInfos = filteredInfos.sort((a, b) => {
+            const aText = a.querySelector(sortOption === 'title' ? '.card-title' : '.text-muted').textContent.toLowerCase();
+            const bText = b.querySelector(sortOption === 'title' ? '.card-title' : '.text-muted').textContent.toLowerCase();
+            return aText.localeCompare(bText);
+        });
+
+        filteredInfos.forEach(item => infoGrid.appendChild(item));
+
+        loadingIndicator.style.display = 'none';
+    }
+
+    searchBar.addEventListener('input', filterAndSortInfos);
+    sortOptions.addEventListener('change', filterAndSortInfos);
+});
+</script>
+{% endblock %}

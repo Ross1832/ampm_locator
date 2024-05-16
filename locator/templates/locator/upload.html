@@ -1,0 +1,48 @@
+{% extends 'locator/base.html' %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Upload</button>
+</form>
+
+<div class="mt-3">
+    <h2>Upload Results</h2>
+    <div class="list-group">
+        {% for order in new_orders %}
+        <div class="list-group-item list-group-item-success">
+            New Order Created: {{ order }}
+        </div>
+        {% endfor %}
+        {% for order in duplicate_orders %}
+        <div class="list-group-item list-group-item-warning">
+            Duplicate Order: {{ order }}
+        </div>
+        {% endfor %}
+        {% for order, error in error_orders %}
+        <div class="list-group-item list-group-item-danger">
+            Error with Order {{ order }}: {{ error }}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Detailed Order Information Section -->
+    <div class="mt-3">
+        <h3>Detailed Order Information</h3>
+        {% for order_detail in order_details %}
+        <div class="list-group-item {{ order_detail.status|lower }}">
+            Order {{ order_detail.order_number }} ({{ order_detail.status }}):
+            <ul>
+                <li>Store Name: {{ order_detail.store_name }}</li>
+                <li>Date: {{ order_detail.date }}</li>
+                <li>Customer Name: {{ order_detail.customer_name }}</li>
+                <li>Item: {{ order_detail.item }}</li>
+                <li>Quantity: {{ order_detail.quantity }}</li>
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}

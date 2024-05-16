@@ -1,0 +1,13 @@
+<!-- orders/templates/admin/orders/order_changelist.html -->
+
+{% extends "admin/change_list.html" %}
+
+{% block object-tools %}
+<div class="object-tools">
+    <ul class="object-tools">
+        <li>
+            <a href="{% url 'admin:upload_excel' %}">Upload Excel</a>
+        </li>
+    </ul>
+</div>
+{% endblock %}
