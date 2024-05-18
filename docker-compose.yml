@@ -1,3 +1,5 @@
+version: '3'
+
 services:
   db:
     image: postgres:13
@@ -24,6 +26,17 @@ services:
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
     depends_on:
       - db
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./static:/app/static
+      - ./media:/app/media
+    depends_on:
+      - web
 
 volumes:
   postgres_data:
