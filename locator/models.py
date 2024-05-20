@@ -3,13 +3,22 @@ from django.db import models
 
 class Item(models.Model):
     MODEL_CHOICES = [
-        ("FTA", "FTA"),
         ("FBA", "FBA"),
+        ("FTA", "FTA"),
         ("FXA", "FXA"),
         ("FGA", "FGA"),
         ("FNA", "FNA"),
+        ("FHY", "FHY"),
+        ("FIB", "FIB"),
+        ("FLA", "FLA"),
+        ("FPA", "FPA"),
+        ("FXB", "FXB"),
+        ("FXT", "FXT"),
         ("AIB", "AIB"),
         ("AGA", "AGA"),
+        ("F01", "F01"),
+        ("F02", "F02"),
+        ("F07", "F07"),
         ("II", "II"),
         ("CCC", "CCC"),
         ("CFA", "CFA"),
@@ -20,20 +29,7 @@ class Item(models.Model):
         ("CTA", "CTA"),
         ("CXA", "CXA"),
         ("CXB", "CXB"),
-        ("F01", "F01"),
-        ("F02", "F02"),
-        ("F07", "F07"),
-        ("FGA", "FGA"),
-        ("FHY", "FHY"),
-        ("FIB", "FIB"),
-        ("FLA", "FLA"),
-        ("FNA", "FNA"),
-        ("FPA", "FPA"),
-        ("FTA", "FTA"),
-        ("FXA", "FXA"),
-        ("FXB", "FXB"),
-        ("FXT", "FXT"),
-        ("СXA", "СXA"),
+        ("СXA", "СXA")
     ]
     model_prefix = models.CharField(max_length=3, choices=MODEL_CHOICES)
     number = models.CharField(max_length=10)

@@ -26,14 +26,12 @@ def set_item(request):
         place = form.cleaned_data["place"]
 
         try:
-            # Try to get the existing item and update it
             item = Item.objects.get(number=number, model_prefix=model_prefix)
             item.line = line
             item.place = place
             item.save()
             message = f"Item {model_prefix}{number} updated successfully!"
         except Item.DoesNotExist:
-            # If the item does not exist, create a new one
             item = Item(
                 number=number,
                 model_prefix=model_prefix,
@@ -70,7 +68,8 @@ def fetch_model_numbers(request):
 
 
 def select_model(request):
-    return render(request, "locator/select_model.html")
+    item_choices = Item.MODEL_CHOICES
+    return render(request, "locator/select_model.html", {'item_choices': item_choices})
 
 
 @csrf_exempt
@@ -229,10 +228,7 @@ def update_order_status(request):
         return JsonResponse({"success": False, "message": str(e)})
 
 
-############################################
-
-
-def upload_orders(request):
+def upload_orders(request):#upload orders
     context = {
         "new_orders": [],
         "duplicate_orders": [],

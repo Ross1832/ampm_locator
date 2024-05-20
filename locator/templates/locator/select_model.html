@@ -2,31 +2,38 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h2>Select the item</h2>
-    <form id="productForm">
-        <div class="form-group">
-            <label for="model_prefix">Model:</label>
-            <select class="form-control" id="model_prefix" name="model_prefix">
-                <option value="">Choose the model</option>
-                <option value="FTA">FTA</option>
-                <option value="FBA">FBA</option>
-                <option value="FXA">FXA</option>
-                <option value="FGA">FGA</option>
-                <option value="FNA">FNA</option>
-                <option value="AIB">AIB</option>
-                <option value="AGA">AGA</option>
-            </select>
+    <div class="row mt-4">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Select the Item</h2>
+                </div>
+                <div class="card-body">
+                    <form id="productForm">
+                        <div class="form-group">
+                            <label for="model_prefix">Model:</label>
+                            <select class="form-control" id="model_prefix" name="model_prefix">
+                                <option value="">Choose the model</option>
+                                {% for code, name in item_choices %}
+                                    <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="number">Number of the model:</label>
+                            <select class="form-control" id="number" name="number">
+                                <option value="">First choose the model</option>
+                            </select>
+                        </div>
+                        <button type="button" id="addItem" class="btn btn-primary">Add Item</button>
+                    </form>
+                </div>
+            </div>
         </div>
-        <div class="form-group">
-            <label for="number">Number of the model:</label>
-            <select class="form-control" id="number" name="number">
-                <option value="">First choose the model</option>
-            </select>
-        </div>
-        <button type="button" id="addItem" class="btn btn-primary">Add Item</button>
-    </form>
+    </div>
+
     <div id="itemList" class="mt-4">
-        <h4>List of Items::</h4>
+        <h4>List of Items:</h4>
         <ul id="itemDisplay" class="list-group"></ul>
     </div>
     <button type="button" id="finalizeList" class="btn btn-success mt-3">Collect</button>
@@ -39,72 +46,70 @@ document.addEventListener("DOMContentLoaded", function () {
     const items = {};
 
     modelPrefixSelect.addEventListener('change', function () {
-    const prefix = this.value;
-    fetch(`/fetch-model-numbers/?model_prefix=${prefix}`)
+        const prefix = this.value;
+        fetch(`/fetch-model-numbers/?model_prefix=${prefix}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                const numberSelect = document.getElementById('number');
+                numberSelect.innerHTML = '<option value="">Choose the number</option>';
+                data.numbers.forEach(function (number) {
+                    const option = new Option(number, number);
+                    numberSelect.add(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error while retrieving model numbers: ' + error.message);
+            });
+    });
+
+    document.getElementById('addItem').addEventListener('click', function () {
+        const prefix = modelPrefixSelect.value;
+        const number = document.getElementById('number').value;
+        const itemKey = `${prefix}${number}`;
+        if (itemKey) {
+            items[itemKey] = (items[itemKey] || 0) + 1;
+            updateDisplay();
+        }
+    });
+
+    document.getElementById('finalizeList').addEventListener('click', function () {
+        const filteredItems = {};
+        Object.keys(items).forEach(key => {
+            if (items[key] > 0) {
+                filteredItems[key] = items[key];
+            }
+        });
+        const jsonData = JSON.stringify({ items: filteredItems });
+        console.log("Sending data to server:", jsonData);
+        fetch(`/finalize-items/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: jsonData
+        })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error('Network response was not ok ' + response.statusText);
             }
             return response.json();
         })
         .then(data => {
-            const numberSelect = document.getElementById('number');
-            numberSelect.innerHTML = '<option value="">Chose the number</option>';
-            data.numbers.forEach(function (number) {
-                const option = new Option(number, number);
-                numberSelect.add(option);
-            });
+            console.log("Data received from server:", data);
+            if (data.items) {
+                displayFinalizedList(data.items);
+            } else {
+                console.error("No items to display", data);
+            }
         })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error while retrieving model numbers: ' + error.message);
-        });
-});
-
-document.getElementById('addItem').addEventListener('click', function () {
-    const prefix = modelPrefixSelect.value;
-    const number = document.getElementById('number').value;
-    const itemKey = `${prefix}${number}`;
-    if (itemKey) {
-        items[itemKey] = (items[itemKey] || 0) + 1;
-        updateDisplay();
-    }
-});
-
-
-    document.getElementById('finalizeList').addEventListener('click', function () {
-    const filteredItems = {};
-    Object.keys(items).forEach(key => {
-        if (items[key] > 0) {
-            filteredItems[key] = items[key];
-        }
+        .catch(error => console.log('Error during fetch:', error));
     });
-    const jsonData = JSON.stringify({ items: filteredItems });
-    console.log("Sending data to server:", jsonData);
-    fetch(`/finalize-items/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: jsonData
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok ' + response.statusText);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log("Data received from server:", data);
-        if (data.items) {
-            displayFinalizedList(data.items);
-        } else {
-            console.error("No items to display", data);
-        }
-    })
-    .catch(error => console.log('Error during fetch:', error));
-});
-
 
     function updateDisplay() {
         itemList.innerHTML = '';
@@ -138,7 +143,7 @@ document.getElementById('addItem').addEventListener('click', function () {
         });
     }
 
-        function displayFinalizedList(items) {
+    function displayFinalizedList(items) {
         const container = document.querySelector('.container');
         const existingTable = document.getElementById('finalizedTable');
         if (existingTable) {
