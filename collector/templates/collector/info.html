@@ -29,10 +29,10 @@
 
     <div class="row" id="info-grid">
         {% for info in infos %}
-            <div class="col-md-6 mb-4 info-item">
-                <div class="card h-100 shadow">
+            <div class="col-md-12 mb-4 info-item">
+                <div class="card h-100 shadow-lg">
                     {% if info.image %}
-                        <img src="{{ info.image.url }}" alt="{{ info.title }}" class="card-img-top" style="max-height: 200px; object-fit: cover;">
+                        <img src="{{ info.image.url }}" alt="{{ info.title }}" class="card-img-top" style="max-height: 400px; object-fit: cover;">
                     {% endif %}
                     <div class="card-body">
                         <h5 class="card-title text-info">{{ info.title }}</h5>
@@ -58,7 +58,6 @@
 </div>
 
 <script>
-
 document.addEventListener('DOMContentLoaded', function () {
     const searchBar = document.getElementById('search-bar');
     const sortOptions = document.getElementById('sort-options');
@@ -74,11 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         filteredInfos.forEach(item => {
             const title = item.querySelector('.card-title').textContent.toLowerCase();
-            if (title.includes(searchTerm)) {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
-            }
+            item.style.display = title.includes(searchTerm) ? '' : 'none';
         });
 
         filteredInfos = filteredInfos.sort((a, b) => {

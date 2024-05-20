@@ -1,17 +1,10 @@
 from django.urls import path
 
-from .views import (
-    CompleteOrderView,
-    HoldOrderView,
-    OrderListView,
-    collect_items,
-    fetch_model_numbers,
-    finalize_items,
-    select_model,
-    set_item,
-    update_order_status,
-    upload_orders,
-)
+from .convert_csv_to_excel import upload_and_download
+from .views import (CompleteOrderView, HoldOrderView, OrderListView,
+                    collect_items, fetch_model_numbers, finalize_items,
+                    select_model, set_item, update_order_status, upload_items,
+                    upload_orders)
 
 urlpatterns = [
     path("", set_item, name="set_item"),
@@ -34,4 +27,8 @@ urlpatterns = [
     path("hold-order/<int:pk>/", HoldOrderView.as_view(), name="hold_order"),
     #######
     path("upload/", upload_orders, name="upload_orders"),
+    #upload items
+    path('upload-items/', upload_items, name='upload_items'),
+    #csv
+    path('upload-and-download/', upload_and_download, name='upload_and_download'),
 ]

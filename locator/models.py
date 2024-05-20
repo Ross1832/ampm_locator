@@ -10,15 +10,41 @@ class Item(models.Model):
         ("FNA", "FNA"),
         ("AIB", "AIB"),
         ("AGA", "AGA"),
+        ("II", "II"),
+        ("CCC", "CCC"),
+        ("CFA", "CFA"),
+        ("CGA", "CGA"),
+        ("CNA", "CNA"),
+        ("CPA", "CPA"),
+        ("CSB", "CSB"),
+        ("CTA", "CTA"),
+        ("CXA", "CXA"),
+        ("CXB", "CXB"),
+        ("F01", "F01"),
+        ("F02", "F02"),
+        ("F07", "F07"),
+        ("FGA", "FGA"),
+        ("FHY", "FHY"),
+        ("FIB", "FIB"),
+        ("FLA", "FLA"),
+        ("FNA", "FNA"),
+        ("FPA", "FPA"),
+        ("FTA", "FTA"),
+        ("FXA", "FXA"),
+        ("FXB", "FXB"),
+        ("FXT", "FXT"),
+        ("СXA", "СXA"),
     ]
     model_prefix = models.CharField(max_length=3, choices=MODEL_CHOICES)
     number = models.CharField(max_length=10)
     line = models.PositiveIntegerField(null=True)
     place = models.PositiveIntegerField(null=True)
     quantity = models.IntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["line", "place"]
+        unique_together = ('number', 'model_prefix')
 
     def __str__(self):
         return f"{self.model_prefix}{self.number}"

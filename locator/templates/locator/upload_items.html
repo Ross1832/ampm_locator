@@ -1,0 +1,53 @@
+{% extends "locator/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Upload Items</h2>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-group">
+      {{ form.file.label_tag }} {{ form.file }}
+    </div>
+    <button type="submit" name="upload" class="btn btn-primary">Upload</button>
+  </form>
+
+  <h2 class="mt-4">Update Items</h2>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-group">
+      {{ update_form.file.label_tag }} {{ update_form.file }}
+    </div>
+    <button type="submit" name="update" class="btn btn-secondary">Update</button>
+  </form>
+
+  {% if results %}
+  <h3 class="mt-4">Results</h3>
+  <table class="table table-striped mt-2">
+    <thead>
+      <tr>
+        <th>Row</th>
+        <th>Item</th>
+        <th>Status</th>
+        <th>Quantity</th>
+        <th>Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for result in results %}
+      <tr class="{% if result.status == 'Failed' %}table-danger
+      {% elif result.status == 'Created' %}table-success
+      {% elif result.status == 'Updated' %}table-warning
+      {% elif result.status == 'Set new quantity' %}table-warning
+      {% else %}table-info{% endif %}">
+        <td>{{ result.row }}</td>
+        <td>{{ result.item }}</td>
+        <td>{{ result.status }}</td>
+        <td>{{ result.quantity|default:"N/A" }}</td>
+        <td>{{ result.reason|default:"" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

@@ -73,7 +73,13 @@ document.getElementById('addItem').addEventListener('click', function () {
 
 
     document.getElementById('finalizeList').addEventListener('click', function () {
-    const jsonData = JSON.stringify({ items: items });
+    const filteredItems = {};
+    Object.keys(items).forEach(key => {
+        if (items[key] > 0) {
+            filteredItems[key] = items[key];
+        }
+    });
+    const jsonData = JSON.stringify({ items: filteredItems });
     console.log("Sending data to server:", jsonData);
     fetch(`/finalize-items/`, {
         method: 'POST',
@@ -143,7 +149,7 @@ document.getElementById('addItem').addEventListener('click', function () {
         finalizedTable.className = 'table table-striped';
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
-        ["Article", "Quantity", "Row", "Line"].forEach(text => {
+        ["Article", "Quantity", "Line", "Place"].forEach(text => {
             const headerCell = document.createElement('th');
             headerCell.textContent = text;
             headerRow.appendChild(headerCell);

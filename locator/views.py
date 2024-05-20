@@ -1,7 +1,7 @@
 import json
+import logging
 
 import pandas as pd
-from dateutil import parser
 from django.db.models import Q, Sum
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
@@ -10,23 +10,42 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 
-from .forms import ItemForm, UploadFileForm
+from .forms import ItemForm, UpdateFileForm, UploadFileForm
 from .models import Item, Order, OrderItem
+from .utils import handle_update_file, handle_uploaded_file, process_excel_data
+
+logger = logging.getLogger(__name__)
 
 
 def set_item(request):
     form = ItemForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        item, created = Item.objects.update_or_create(
-            number=form.cleaned_data["number"], defaults=form.cleaned_data
-        )
-        message = (
-            f"Item {form.cleaned_data['model_prefix']}{form.cleaned_data['number']} "
-            f"{'added' if created else 'updated'} successfully!"
-        )
+        number = form.cleaned_data["number"]
+        model_prefix = form.cleaned_data["model_prefix"]
+        line = form.cleaned_data["line"]
+        place = form.cleaned_data["place"]
+
+        try:
+            # Try to get the existing item and update it
+            item = Item.objects.get(number=number, model_prefix=model_prefix)
+            item.line = line
+            item.place = place
+            item.save()
+            message = f"Item {model_prefix}{number} updated successfully!"
+        except Item.DoesNotExist:
+            # If the item does not exist, create a new one
+            item = Item(
+                number=number,
+                model_prefix=model_prefix,
+                line=line,
+                place=place
+            )
+            item.save()
+            message = f"Item {model_prefix}{number} added successfully!"
+
         return redirect("set_item")
     else:
-        items = Item.objects.all().order_by("-id")[:5]  # Fetch only the last 5 items
+        items = Item.objects.all().order_by("-updated_at")[:5]
         context = {"form": form, "items": items}
         if request.method == "POST":
             context["errors"] = form.errors
@@ -77,6 +96,7 @@ def finalize_items(request):
                 "place": item.place,
             }
             for item in items_query
+            if items_data.get(f"{item.model_prefix}{item.number}", 0) > 0
         ]
 
         return JsonResponse({"items": results})
@@ -234,104 +254,29 @@ def upload_orders(request):
     return render(request, "locator/upload.html", context)
 
 
-def process_excel_data(data):
-    results = {
-        "new_orders": [],
-        "duplicate_orders": [],
-        "error_orders": [],
-        "order_details": [],
-    }
-    required_columns = [
-        "store_name",
-        "date",
-        "order_number",
-        "customer_name",
-        "item",
-        "quantity",
-    ]
+def upload_items(request): #upload items
+    if request.method == 'POST':
+        if 'upload' in request.POST:
+            form = UploadFileForm(request.POST, request.FILES)
+            update_form = UpdateFileForm()
+            if form.is_valid():
+                results = handle_uploaded_file(request.FILES['file'])
+                return render(request, 'locator/upload_items.html', {'form': form, 'update_form': update_form, 'results': results})
+        elif 'update' in request.POST:
+            form = UploadFileForm()
+            update_form = UpdateFileForm(request.POST, request.FILES)
+            if update_form.is_valid():
+                results = handle_update_file(request.FILES['file'])
+                return render(request, 'locator/upload_items.html', {'form': form, 'update_form': update_form, 'results': results})
+    else:
+        form = UploadFileForm()
+        update_form = UpdateFileForm()
+    return render(request, 'locator/upload_items.html', {'form': form, 'update_form': update_form})
 
-    for index, row in data.iterrows():
-        order_info = {
-            col: str(row[col]).strip() if pd.notna(row[col]) else None
-            for col in required_columns
-        }
 
-        missing_fields = [
-            field for field in required_columns if pd.isna(row.get(field))
-        ]
-        if missing_fields:
-            results["error_orders"].append(
-                (
-                    order_info["order_number"],
-                    f"Row {index + 2}: Missing fields: {missing_fields}",
-                )
-            )
-            continue
 
-        try:
-            date = (
-                parser.parse(order_info["date"], dayfirst=True).date()
-                if order_info["date"]
-                else None
-            )
-        except ValueError as e:
-            results["error_orders"].append(
-                (order_info["order_number"], f"Row {index + 2}: Invalid date format")
-            )
-            continue
 
-        order_number = order_info["order_number"]
 
-        if Order.objects.filter(order_number=order_number).exists():
-            results["duplicate_orders"].append(order_number)
-            continue
 
-        try:
-            item = Item.objects.get(
-                model_prefix=order_info["item"][:3] if order_info["item"] else "",
-                number=order_info["item"][3:] if order_info["item"] else "",
-            )
-        except Item.DoesNotExist:
-            results["error_orders"].append(
-                (order_number, f"Row {index + 2}: Item does not exist")
-            )
-            continue
 
-        try:
-            order = Order.objects.create(
-                store_name=order_info["store_name"],
-                date=date,
-                order_number=order_number,
-                customer_name=order_info["customer_name"],
-                status="INP",
-            )
-            OrderItem.objects.create(
-                order=order, item=item, quantity=order_info["quantity"]
-            )
-            results["new_orders"].append(order_number)
-            results["order_details"].append(
-                {
-                    "store_name": order_info["store_name"],
-                    "date": order_info["date"],
-                    "order_number": order_number,
-                    "customer_name": order_info["customer_name"],
-                    "item": order_info["item"],
-                    "quantity": order_info["quantity"],
-                    "status": "Created",
-                }
-            )
-        except Exception as e:
-            results["error_orders"].append((order_number, f"Row {index + 2}: {str(e)}"))
-            results["order_details"].append(
-                {
-                    "store_name": order_info["store_name"],
-                    "date": order_info["date"],
-                    "order_number": order_number,
-                    "customer_name": order_info["customer_name"],
-                    "item": order_info["item"],
-                    "quantity": order_info["quantity"],
-                    "status": "Error",
-                }
-            )
 
-    return results
