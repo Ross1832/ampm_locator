@@ -1,5 +1,6 @@
 import logging
-
+import PyPDF2
+import re
 import pandas as pd
 from dateutil import parser
 from django.utils import timezone
@@ -231,3 +232,98 @@ def process_excel_data(data):
             )
 
     return results
+
+
+#pdf all
+def extract_text_from_pdf(pdf_path):
+    text = ''
+    with open(pdf_path, 'rb') as f:
+        reader = PyPDF2.PdfReader(f)
+        for page in reader.pages:
+            text += page.extract_text()
+    return text
+
+def parse_orders(text):
+    # Your existing parsing logic
+    orders = text.split('Liefern an:')
+    orders = orders[1:]  # Skip the first empty split
+    data = []  # List of dicts to store data
+    for order_text in orders:
+        lines = order_text.strip().split('\n')
+        # Initialize variables
+        order_number = ''
+        order_date = ''
+        buyer_name = ''
+        delivery_service = ''
+        items = []
+        in_item_section = False
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            # Extract buyer name (first non-empty line)
+            if buyer_name == '' and line != '':
+                buyer_name = line
+            # Extract order number
+            if line.startswith('Bestellnummer:'):
+                order_number = line.replace('Bestellnummer:', '').strip()
+            elif 'Bestelldatum' in line and 'Käufer' in line and 'Versandart' in line:
+                # Next line contains the data
+                if i+1 < len(lines):
+                    data_line = lines[i+1].strip()
+                    parts = data_line.split()
+                    if len(parts) >= 4:
+                        order_date = parts[1]
+                        delivery_service = parts[-1]
+                        buyer_name_parts = parts[2:-1]
+                        buyer_name = ' '.join(buyer_name_parts)
+                    i += 1  # Skip data line
+            elif line.startswith('Menge Produktdetails'):
+                in_item_section = True
+            elif in_item_section:
+                if line.startswith('EUR '):
+                    in_item_section = False
+                elif line.strip() == '':
+                    pass
+                else:
+                    # Use regex to extract quantity and possible SKU
+                    match = re.match(r'^(\d+)\s*(\S*)\s*(.*)$', line)
+                    if match:
+                        item_quantity = match.group(1)
+                        possible_sku = match.group(2)
+                        # Look for 'SKU:' line after this line
+                        sku_found = False
+                        for j in range(i+1, len(lines)):
+                            sku_line = lines[j].strip()
+                            if sku_line.startswith('SKU:'):
+                                item_sku = sku_line.replace('SKU:', '').strip()
+                                sku_found = True
+                                i = j  # Move index to SKU line
+                                break
+                            elif sku_line.startswith('Artikelnr.:'):
+                                # If 'SKU:' line not found but 'Artikelnr.:' found, stop looking
+                                break
+                        if not sku_found:
+                            if possible_sku != '':
+                                item_sku = possible_sku
+                            else:
+                                # If no SKU found, set as empty or handle accordingly
+                                item_sku = ''
+                        items.append({
+                            'quantity': item_quantity,
+                            'sku': item_sku
+                        })
+                    else:
+                        # Line doesn't match expected format, skip or handle
+                        pass
+            i += 1
+        # Now, for each item, create a data row
+        for item in items:
+            data.append({
+                'Order number': order_number,
+                'Order date': order_date,
+                'Buyer name': buyer_name,
+                'SKU': item['sku'],
+                'Quantity': item['quantity'],
+                'Delivery service': delivery_service
+            })
+    return data

@@ -3,55 +3,31 @@
 {% block content %}
 <div class="container mt-5">
     <div class="jumbotron text-center">
-        <h1 class="display-4">Upload CSV and Download as Excel</h1>
-        <p class="lead">Upload your eBay or Shopify CSV files and convert them to Excel format</p>
+        <h1 class="display-4">Upload PDF Orders and Download as Excel</h1>
+        <p class="lead">Upload your PDF order files and convert them to Excel format</p>
         <hr class="my-4">
-        <p>Select the appropriate file and click the upload button to process your file into Excel</p>
+        <p>Select one or multiple PDF files and click the upload button to process them into an Excel file</p>
     </div>
 
     <div class="row mt-4">
-        <div class="col-md-6">
+        <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <h2>Upload eBay CSV</h2>
+                    <h2>Upload PDF Files</h2>
                 </div>
                 <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_and_download' %}">
+                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs' %}">
                         {% csrf_token %}
                         <div class="form-group">
-                            <label for="ebayCsvFile">Choose eBay CSV File</label>
-                            <input type="file" class="form-control-file" id="ebayCsvFile" name="csv_file" accept=".csv" required>
+                            <label for="pdfFiles">Choose PDF Files</label>
+                            <input type="file" class="form-control-file" id="pdfFiles" name="pdf_files" accept=".pdf" multiple required>
                         </div>
-                        <button type="submit" class="btn btn-primary" name="process_ebay">Upload and Convert eBay CSV</button>
+                        <button type="submit" class="btn btn-primary">Upload and Convert PDFs</button>
                     </form>
 
-                    {% if ebay_excel_file_url %}
+                    {% if excel_file_url %}
                         <div class="alert alert-success mt-3">
-                            <a href="{{ ebay_excel_file_url }}" class="alert-link">Download eBay Excel File</a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h2>Upload Shopify CSV</h2>
-                </div>
-                <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_and_download' %}">
-                        {% csrf_token %}
-                        <div class="form-group">
-                            <label for="shopifyCsvFile">Choose Shopify CSV File</label>
-                            <input type="file" class="form-control-file" id="shopifyCsvFile" name="csv_file" accept=".csv" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary" name="process_shopify">Upload and Convert Shopify CSV</button>
-                    </form>
-
-                    {% if shopify_excel_file_url %}
-                        <div class="alert alert-success mt-3">
-                            <a href="{{ shopify_excel_file_url }}" class="alert-link">Download Shopify Excel File</a>
+                            <a href="{{ excel_file_url }}" class="alert-link">Download Excel File</a>
                         </div>
                     {% endif %}
                 </div>

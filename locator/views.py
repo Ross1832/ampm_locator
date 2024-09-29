@@ -1,6 +1,10 @@
 import json
 import logging
-
+import uuid
+import os
+from .utils import extract_text_from_pdf, parse_orders
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
 import pandas as pd
 from django.db.models import Q, Sum
 from django.http import HttpResponseRedirect, JsonResponse
@@ -272,7 +276,39 @@ def upload_items(request): #upload items
 
 
 
+#pdf_all
+def upload_pdfs(request):
+    if request.method == 'POST' and request.FILES.getlist('pdf_files'):
+        pdf_files = request.FILES.getlist('pdf_files')
+        fs = FileSystemStorage(location=settings.MEDIA_ROOT)
 
+        all_data = []
 
+        for pdf_file in pdf_files:
+            # Generate a unique filename to prevent conflicts
+            unique_filename = f"{uuid.uuid4().hex}_{pdf_file.name}"
+            filename = fs.save(unique_filename, pdf_file)
+            uploaded_file_path = fs.path(filename)
 
+            # Process the PDF file
+            text = extract_text_from_pdf(uploaded_file_path)
+            data = parse_orders(text)
+            all_data.extend(data)
 
+            # Delete the uploaded PDF after processing
+            fs.delete(filename)
+
+        # Create a DataFrame from the combined data
+        df = pd.DataFrame(all_data, columns=['Order number', 'Order date', 'Buyer name', 'SKU', 'Quantity', 'Delivery service'])
+
+        # Save the Excel file
+        output_filename = f'orders_{uuid.uuid4().hex}.xlsx'
+        output_filepath = os.path.join(settings.MEDIA_ROOT, output_filename)
+        df.to_excel(output_filepath, index=False)
+
+        # Provide the URL to download the file
+        excel_file_url = fs.url(output_filename)
+
+        return render(request, 'locator/upload_pdfs.html', {'excel_file_url': excel_file_url})
+
+    return render(request, 'locator/upload_pdfs.html')
