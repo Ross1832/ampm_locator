@@ -15,6 +15,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView
+from django.core.files.storage import default_storage
 
 from .forms import ItemForm, UpdateFileForm, UploadFileForm
 from .models import Item, Order, OrderItem
@@ -334,3 +335,51 @@ def upload_pdfs(request):
     </html>
     '''
     return HttpResponse(html_form)
+
+
+def aggregate_skus(request):
+    if request.method == 'POST':
+        excel_files = request.FILES.getlist('excel_files')
+        if not excel_files:
+            return HttpResponse("No files uploaded")
+
+        dfs = []
+        for uploaded_file in excel_files:
+            # Save uploaded file temporarily
+            temp_file_path = os.path.join(settings.MEDIA_ROOT, uploaded_file.name)
+            with default_storage.open(temp_file_path, 'wb+') as destination:
+                for chunk in uploaded_file.chunks():
+                    destination.write(chunk)
+            # Read Excel file into DataFrame
+            df = pd.read_excel(temp_file_path)
+            dfs.append(df)
+            # Remove temporary file
+            default_storage.delete(temp_file_path)
+
+        # Concatenate all dataframes
+        df_all = pd.concat(dfs, ignore_index=True)
+
+        # Ensure 'Quantity' is numeric
+        df_all['Quantity'] = pd.to_numeric(df_all['Quantity'], errors='coerce')
+
+        # Group by 'SKU' and sum 'Quantity'
+        result = df_all.groupby('SKU', as_index=False)['Quantity'].sum()
+
+        # Sort the result by 'SKU' in ascending order
+        result = result.sort_values(by='SKU')
+
+        # Generate a unique filename
+        output_filename = f'aggregated_quantities_{uuid.uuid4()}.xlsx'
+        output_file_path = os.path.join(settings.MEDIA_ROOT, output_filename)
+
+        # Output to Excel
+        result.to_excel(output_file_path, index=False)
+
+        # Build file URL
+        aggregated_file_url = settings.MEDIA_URL + output_filename
+
+        return render(request, 'upload_and_download.html', {
+            'aggregated_file_url': aggregated_file_url
+        })
+    else:
+        return render(request, 'upload_and_download.html')
