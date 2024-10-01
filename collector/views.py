@@ -1,13 +1,13 @@
 from django.core.checks import Info
 from django.core.paginator import Paginator
+from django.core.checks import Info
 from django.core.paginator import Paginator
 from django.shortcuts import render
-
+from .models import UsefulInfo
 from .models import Info
 
-
 def info_list(request):
-    infos = Info.objects.all().order_by('title')  # Use your own Info model
+    infos = Info.objects.all().order_by('title')  # Default ordering
 
     # Pagination
     paginator = Paginator(infos, 10)  # Show 10 infos per page
