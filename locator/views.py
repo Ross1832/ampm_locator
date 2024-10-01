@@ -2,6 +2,8 @@ import json
 import logging
 import uuid
 import os
+import io
+from django.http import HttpResponse
 from .utils import extract_text_from_pdf, parse_orders
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
@@ -277,6 +279,7 @@ def upload_items(request): #upload items
 
 
 #pdf_all
+@csrf_exempt  # Use this decorator if you decide not to handle CSRF tokens in the form
 def upload_pdfs(request):
     if request.method == 'POST' and request.FILES.getlist('pdf_files'):
         pdf_files = request.FILES.getlist('pdf_files')
@@ -301,14 +304,33 @@ def upload_pdfs(request):
         # Create a DataFrame from the combined data
         df = pd.DataFrame(all_data, columns=['Order number', 'Order date', 'Buyer name', 'SKU', 'Quantity', 'Delivery service'])
 
-        # Save the Excel file
-        output_filename = f'orders_{uuid.uuid4().hex}.xlsx'
-        output_filepath = os.path.join(settings.MEDIA_ROOT, output_filename)
-        df.to_excel(output_filepath, index=False)
+        # Save the Excel file to an in-memory stream
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False)
+        output.seek(0)
 
-        # Provide the URL to download the file
-        excel_file_url = fs.url(output_filename)
+        # Prepare response to download the file
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename=orders_{uuid.uuid4().hex}.xlsx'
 
-        return render(request, 'locator/upload_pdfs.html', {'excel_file_url': excel_file_url})
+        return response
 
-    return render(request, 'locator/upload_pdfs.html')
+    # If GET request or no files uploaded, render the upload page
+    html_form = '''
+    <!DOCTYPE html>
+    <html>
+    <body>
+    <h2>Upload PDFs</h2>
+    <form action="" method="post" enctype="multipart/form-data">
+        <!-- {% csrf_token %} -->  <!-- Uncomment this if you handle CSRF tokens -->
+        <input type="file" name="pdf_files" multiple required>
+        <input type="submit" value="Upload">
+    </form>
+    </body>
+    </html>
+    '''
+    return HttpResponse(html_form)
