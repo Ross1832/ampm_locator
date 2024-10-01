@@ -378,8 +378,8 @@ def aggregate_skus(request):
         # Build file URL
         aggregated_file_url = settings.MEDIA_URL + output_filename
 
-        return render(request, 'upload_and_download.html', {
+        return render(request, 'locator/upload_and_download.html', {
             'aggregated_file_url': aggregated_file_url
         })
     else:
-        return render(request, 'upload_and_download.html')
+        return render(request, 'locator/upload_and_download.html')
