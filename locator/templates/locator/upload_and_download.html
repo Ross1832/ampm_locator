@@ -2,33 +2,35 @@
 
 {% block content %}
 <div class="container mt-5">
-    <div class="jumbotron text-center">
-        <h1 class="display-4">Upload Files and Download Processed Data</h1>
-        <p class="lead">Upload your files and process them accordingly.</p>
-        <hr class="my-4">
+    <div class="jumbotron text-center bg-primary text-white">
+        <h1 class="display-4">File Processing Portal</h1>
+        <p class="lead">Easily upload and process your files with our intuitive interface.</p>
+        <hr class="my-4 bg-light">
         <p>Select one or multiple files and click the upload button to process them.</p>
     </div>
 
     <div class="row mt-4">
         <!-- PDF to Excel Form -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h2>Upload PDF Files</h2>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h2 class="h5 mb-0">Convert PDFs to Excel</h2>
                 </div>
-                <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs' %}">
+                <div class="card-body d-flex flex-column">
+                    <p>Upload your PDF order files and convert them to Excel format.</p>
+                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs' %}" class="mt-auto">
                         {% csrf_token %}
                         <div class="form-group">
                             <label for="pdfFiles">Choose PDF Files</label>
                             <input type="file" class="form-control-file" id="pdfFiles" name="pdf_files" accept=".pdf" multiple required>
                         </div>
-                        <button type="submit" class="btn btn-primary">Upload and Convert PDFs</button>
+                        <button type="submit" class="btn btn-success btn-block">Upload and Convert PDFs</button>
                     </form>
 
                     {% if excel_file_url %}
                         <div class="alert alert-success mt-3">
-                            <a href="{{ excel_file_url }}" class="alert-link">Download Excel File</a>
+                            <strong>Success!</strong> Your Excel file is ready.
+                            <a href="{{ excel_file_url }}" class="alert-link d-block mt-2">Download Excel File</a>
                         </div>
                     {% endif %}
                 </div>
@@ -36,24 +38,26 @@
         </div>
 
         <!-- SKU Aggregation Form -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h2>Upload Excel Files for SKU Aggregation</h2>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h2 class="h5 mb-0">Aggregate SKUs from Excel</h2>
                 </div>
-                <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" action="{% url 'aggregate_skus' %}">
+                <div class="card-body d-flex flex-column">
+                    <p>Upload Excel files to aggregate SKUs and get summarized data.</p>
+                    <form method="post" enctype="multipart/form-data" action="{% url 'aggregate_skus' %}" class="mt-auto">
                         {% csrf_token %}
                         <div class="form-group">
                             <label for="excelFiles">Choose Excel Files</label>
                             <input type="file" class="form-control-file" id="excelFiles" name="excel_files" accept=".xlsx" multiple required>
                         </div>
-                        <button type="submit" class="btn btn-primary">Upload and Aggregate SKUs</button>
+                        <button type="submit" class="btn btn-info btn-block">Upload and Aggregate SKUs</button>
                     </form>
 
                     {% if aggregated_file_url %}
                         <div class="alert alert-success mt-3">
-                            <a href="{{ aggregated_file_url }}" class="alert-link">Download Aggregated Excel File</a>
+                            <strong>Success!</strong> Your aggregated Excel file is ready.
+                            <a href="{{ aggregated_file_url }}" class="alert-link d-block mt-2">Download Aggregated Excel File</a>
                         </div>
                     {% endif %}
                 </div>
