@@ -326,7 +326,7 @@ def upload_pdfs(request):
     <body>
     <h2>Upload PDFs</h2>
     <form action="" method="post" enctype="multipart/form-data">
-        <!-- {% csrf_token %} -->  <!-- Uncomment this if you handle CSRF tokens -->
+        <!-- {% csrf_token %} -->
         <input type="file" name="pdf_files" multiple required>
         <input type="submit" value="Upload">
     </form>

@@ -32,3 +32,4 @@ tablib==3.5.0
 tomli==2.0.1
 typing_extensions==4.11.0
 tzdata==2024.1
+XlsxWriter==3.2.0
