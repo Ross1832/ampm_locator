@@ -3,107 +3,64 @@
 {% block title %}Useful Information{% endblock %}
 
 {% block content %}
-<div class="container my-5">
-    <h1 class="mb-5 text-primary text-center">Useful Information</h1>
+<div class="container my-4">
+    <h1 class="mb-4 text-primary text-center">Useful Information</h1>
 
-    <!-- Search and Sort Controls -->
     <div class="row mb-4">
-        <div class="col-md-6">
+        <div class="col-md-8 mx-auto">
             <input type="text" id="search-bar" class="form-control" placeholder="Search for information...">
         </div>
-        <div class="col-md-3">
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4 mx-auto">
             <select id="sort-options" class="form-control">
                 <option value="title">Sort by Title</option>
                 <option value="date">Sort by Date</option>
             </select>
         </div>
-        <div class="col-md-3 text-right">
-            <button class="btn btn-primary" id="reset-filters">Reset Filters</button>
-        </div>
     </div>
 
-    <!-- Loading Indicator -->
-    <div id="loading-indicator" class="text-center my-5" style="display: none;">
-        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+    <div id="loading-indicator" class="text-center" style="display: none;">
+        <div class="spinner-border" role="status">
             <span class="sr-only">Loading...</span>
         </div>
     </div>
 
-    <!-- Information Grid -->
     <div class="row" id="info-grid">
         {% for info in infos %}
-            <div class="col-md-6 mb-4 info-item">
-                <div class="card h-100 shadow-sm">
+            <div class="col-md-12 mb-4 info-item">
+                <div class="card h-100 shadow-lg">
                     {% if info.image %}
-                        <img src="{{ info.image.url }}" alt="{{ info.title }}" class="card-img-top" style="max-height: 250px; object-fit: cover;">
+                        <img src="{{ info.image.url }}" alt="{{ info.title }}" class="card-img-top" style="max-height: 400px; object-fit: cover;">
                     {% endif %}
-                    <div class="card-body d-flex flex-column">
+                    <div class="card-body">
                         <h5 class="card-title text-info">{{ info.title }}</h5>
                         <p class="card-text">{{ info.description }}</p>
-                        <a href="{{ info.get_absolute_url }}" class="mt-auto btn btn-outline-primary">Read More</a>
                     </div>
-                    <div class="card-footer text-muted">
-                        <small>Last updated: {{ info.updated_at|date:"F j, Y" }}</small>
+                    <div class="card-footer">
+                        <small class="text-muted">Last updated: {{ info.updated_at }}</small>
                     </div>
                 </div>
-            </div>
-        {% empty %}
-            <div class="col-12">
-                <p class="text-center text-muted">No information available.</p>
             </div>
         {% endfor %}
     </div>
 
-    <!-- Pagination -->
-    {% if is_paginated %}
-        <nav aria-label="Page navigation">
-            <ul class="pagination justify-content-center">
-                {% if page_obj.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">
-                            <span aria-hidden="true">&laquo; Previous</span>
-                        </a>
-                    </li>
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link" aria-hidden="true">&laquo; Previous</span>
-                    </li>
-                {% endif %}
-
-                {% for num in paginator.page_range %}
-                    {% if page_obj.number == num %}
-                        <li class="page-item active">
-                            <span class="page-link">{{ num }}</span>
-                        </li>
-                    {% else %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-                        </li>
-                    {% endif %}
-                {% endfor %}
-
-                {% if page_obj.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">
-                            <span aria-hidden="true">Next &raquo;</span>
-                        </a>
-                    </li>
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link" aria-hidden="true">Next &raquo;</span>
-                    </li>
-                {% endif %}
-            </ul>
-        </nav>
-    {% endif %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            <li class="page-item"><a class="page-link" href="#" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a></li>
+            {% for page_num in page_numbers %}
+                <li class="page-item"><a class="page-link" href="#">{{ page_num }}</a></li>
+            {% endfor %}
+            <li class="page-item"><a class="page-link" href="#" aria-label="Next"><span aria-hidden="true">&raquo;</span></a></li>
+        </ul>
+    </nav>
 </div>
 
-<!-- Custom JavaScript -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const searchBar = document.getElementById('search-bar');
     const sortOptions = document.getElementById('sort-options');
-    const resetButton = document.getElementById('reset-filters');
     const infoGrid = document.getElementById('info-grid');
     const loadingIndicator = document.getElementById('loading-indicator');
 
@@ -112,42 +69,26 @@ document.addEventListener('DOMContentLoaded', function () {
         const searchTerm = searchBar.value.toLowerCase();
         const sortOption = sortOptions.value;
 
-        let infoItems = Array.from(infoGrid.getElementsByClassName('info-item'));
+        let filteredInfos = Array.from(infoGrid.getElementsByClassName('info-item'));
 
-        // Filter items
-        infoItems.forEach(item => {
+        filteredInfos.forEach(item => {
             const title = item.querySelector('.card-title').textContent.toLowerCase();
-            const description = item.querySelector('.card-text').textContent.toLowerCase();
-            if (title.includes(searchTerm) || description.includes(searchTerm)) {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
-            }
+            item.style.display = title.includes(searchTerm) ? '' : 'none';
         });
 
-        // Sort items
-        infoItems = infoItems.filter(item => item.style.display !== 'none');
-        infoItems.sort((a, b) => {
-            const aText = a.querySelector(sortOption === 'title' ? '.card-title' : '.card-footer small').textContent.toLowerCase();
-            const bText = b.querySelector(sortOption === 'title' ? '.card-title' : '.card-footer small').textContent.toLowerCase();
+        filteredInfos = filteredInfos.sort((a, b) => {
+            const aText = a.querySelector(sortOption === 'title' ? '.card-title' : '.text-muted').textContent.toLowerCase();
+            const bText = b.querySelector(sortOption === 'title' ? '.card-title' : '.text-muted').textContent.toLowerCase();
             return aText.localeCompare(bText);
         });
 
-        // Append sorted items
-        infoItems.forEach(item => infoGrid.appendChild(item));
+        filteredInfos.forEach(item => infoGrid.appendChild(item));
 
         loadingIndicator.style.display = 'none';
     }
 
-    function resetFilters() {
-        searchBar.value = '';
-        sortOptions.value = 'title';
-        filterAndSortInfos();
-    }
-
     searchBar.addEventListener('input', filterAndSortInfos);
     sortOptions.addEventListener('change', filterAndSortInfos);
-    resetButton.addEventListener('click', resetFilters);
 });
 </script>
 {% endblock %}
