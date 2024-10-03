@@ -1,3 +1,4 @@
+
 {% extends 'locator/base.html' %}
 
 {% block content %}
@@ -30,6 +31,12 @@
                         <div class="alert alert-success mt-3">
                             <strong>Success!</strong> Your Excel file is ready.
                             <a href="{{ excel_file_url }}" class="alert-link d-block mt-2">Download Excel File</a>
+                        </div>
+                    {% endif %}
+
+                    {% if error_message %}
+                        <div class="alert alert-danger mt-3">
+                            <strong>Error:</strong> {{ error_message }}
                         </div>
                     {% endif %}
                 </div>

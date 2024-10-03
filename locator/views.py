@@ -16,10 +16,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 from django.core.files.storage import default_storage
-
+import pdfplumber
 from .forms import ItemForm, UpdateFileForm, UploadFileForm
 from .models import Item, Order, OrderItem
 from .utils import handle_update_file, handle_uploaded_file, process_excel_data
+import re
+from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 
@@ -381,5 +383,104 @@ def aggregate_skus(request):
         return render(request, 'locator/upload_and_download.html', {
             'aggregated_file_url': aggregated_file_url
         })
+    else:
+        return render(request, 'locator/upload_and_download.html')
+
+
+#### home24
+
+def upload_pdfs_home24(request):
+    if request.method == 'POST':
+        pdf_files = request.FILES.getlist('pdf_files')
+        all_orders = []
+
+        for pdf_file in pdf_files:
+            # Save the uploaded file temporarily
+            temp_pdf_path = default_storage.save('temp/' + pdf_file.name, ContentFile(pdf_file.read()))
+            # Process the PDF file
+            text = ''
+            with pdfplumber.open(default_storage.path(temp_pdf_path)) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + '\n'
+            # Delete the temporary file
+            default_storage.delete(temp_pdf_path)
+
+            # Extract orders from text
+            def extract_orders_from_text(text):
+                orders = []
+                # Split orders by 'Lieferschein' keyword, assuming each order starts with it
+                order_texts = text.split('Lieferschein')
+                for order_text in order_texts[1:]:  # Skip the first split if it's before the first 'Lieferschein'
+                    order = {}
+                    # Extract Order Number
+                    match = re.search(r'Bestellnummer:\s*(.*)', order_text)
+                    if match:
+                        order['Order number'] = match.group(1).strip()
+                    else:
+                        continue  # Skip if no order number found
+                    # Extract Order Date
+                    match = re.search(r'Bestelldatum:\s*(.*)', order_text)
+                    if match:
+                        order['Order date'] = match.group(1).strip()
+                    # Extract Buyer's Name
+                    match = re.search(r'Name des Kunden:\s*(.*)', order_text)
+                    if match:
+                        order["Buyer's name"] = match.group(1).strip()
+                    # Extract Delivery Service
+                    match = re.search(r'Versandmethode:\s*(.*)', order_text)
+                    if match:
+                        order['Delivery service'] = match.group(1).strip()
+                    # Extract SKU and Quantity
+                    match = re.search(r'Shop-Referenz:\s*(.*)', order_text)
+                    if match:
+                        order['SKU'] = match.group(1).strip()
+                        # Extract Quantity
+                        # Split the order_text into lines for processing
+                        lines = order_text.split('\n')
+                        # Find the index of the line containing 'Shop-Referenz:'
+                        for i, line in enumerate(lines):
+                            if 'Shop-Referenz:' in line:
+                                # Look for the next non-empty line containing only digits
+                                for j in range(i + 1, len(lines)):
+                                    quantity_line = lines[j].strip()
+                                    if quantity_line.isdigit():
+                                        order['Quantity'] = quantity_line
+                                        break
+                                    elif quantity_line == '':
+                                        continue
+                                    else:
+                                        # If a non-digit line is encountered, default to '1'
+                                        order['Quantity'] = '1'
+                                        break
+                                else:
+                                    # If loop completes without finding quantity, default to '1'
+                                    order['Quantity'] = '1'
+                                break
+                    else:
+                        order['SKU'] = ''
+                        order['Quantity'] = '1'  # Default quantity if SKU is not found
+                    orders.append(order)
+                return orders
+
+            orders = extract_orders_from_text(text)
+            if not orders:
+                print(f"No orders found in {pdf_file.name}")
+            all_orders.extend(orders)
+        if not all_orders:
+            return render(request, 'locator/base.html', {
+                'error_message': 'No orders were extracted. Please check the PDF files and the extraction logic.'
+            })
+        # Create DataFrame and write to Excel
+        df = pd.DataFrame(all_orders)
+        # Reorder columns as specified
+        df = df[['Order number', 'Order date', "Buyer's name", 'SKU', 'Quantity', 'Delivery service']]
+        # Save the Excel file
+        excel_file_name = 'orders.xlsx'
+        excel_file_path = os.path.join(settings.MEDIA_ROOT, excel_file_name)
+        df.to_excel(excel_file_path, index=False)
+        excel_file_url = settings.MEDIA_URL + excel_file_name
+        return render(request, 'locator/upload_and_download.html', {'excel_file_url': excel_file_url})
     else:
         return render(request, 'locator/upload_and_download.html')
