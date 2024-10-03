@@ -35,4 +35,5 @@ urlpatterns = [
     path('aggregate-skus/', aggregate_skus, name='aggregate_skus'),
     path('upload_pdfs/', upload_pdfs_home24, name='upload_pdfs_home24'),
     path('upload_pdfs_mano/', upload_pdfs_mano, name='upload_pdfs_mano'),
+path('upload_pdfs_new_functionality/', upload_pdfs_new_functionality, name='upload_pdfs_new_functionality'),
 ]

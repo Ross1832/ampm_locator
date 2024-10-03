@@ -487,7 +487,6 @@ def upload_pdfs_home24(request):
 
 
 ### mano
-
 def upload_pdfs_mano(request):
     if request.method == 'POST':
         pdf_files = request.FILES.getlist('pdf_files_mano')
@@ -649,6 +648,129 @@ def upload_pdfs_mano(request):
             mano_excel_file_url = settings.MEDIA_URL + excel_file_name
             return render(request, 'locator/upload_and_download.html', {
                 'mano_excel_file_url': mano_excel_file_url
+            })
+    else:
+        return render(request, 'locator/upload_and_download.html')
+
+
+#ampm
+def upload_pdfs_new_functionality(request):
+    if request.method == 'POST':
+        pdf_files = request.FILES.getlist('pdf_files_new')
+        data_list = []
+
+        for pdf_file in pdf_files:
+            # Save the uploaded file temporarily
+            temp_pdf_path = default_storage.save('temp/' + pdf_file.name, ContentFile(pdf_file.read()))
+            pdf_full_path = default_storage.path(temp_pdf_path)
+            print(f"Processing file: {pdf_full_path}")
+
+            # Extract text from PDF
+            with pdfplumber.open(pdf_full_path) as pdf:
+                text = ''
+                # Extract text from all pages
+                for page_num, page in enumerate(pdf.pages, start=1):
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + '\n'
+                    else:
+                        text += f'[Page {page_num} has no extractable text]\n'
+
+            # Optionally write the extracted text to a text file for debugging
+            # text_filename = pdf_file.name.replace('.pdf', '.txt')
+            # with open(os.path.join(settings.MEDIA_ROOT, text_filename), 'w', encoding='utf-8') as f:
+            #     f.write(text)
+
+            # Extract data using the function
+            def extract_data_from_text(text):
+                lines = text.split('\n')
+                order_number = ''
+                order_date = ''
+                buyer_name = ''
+                sku = ''
+                quantity = ''
+                # Process lines
+                for i, line in enumerate(lines):
+                    line = line.strip()
+                    # Extract order number
+                    if 'BESTELLNUMMER' in line:
+                        match = re.search(r'BESTELLNUMMER\s*:\s*(#?\S+)', line)
+                        if match:
+                            order_number = match.group(1).strip()
+                        continue
+                    # Extract order date
+                    if 'BESTELLDATUM' in line:
+                        match = re.search(r'BESTELLDATUM\s*:\s*([\d\.]+\s*[\d:]+)', line)
+                        if match:
+                            order_date = match.group(1).strip()
+                        continue
+                    # Extract buyer's name
+                    if 'VERSANDDETAILS' in line:
+                        # The next line contains buyer's name repeated
+                        if i + 1 < len(lines):
+                            buyer_line = lines[i + 1].strip()
+                            buyer_name_parts = buyer_line.split()
+                            if len(buyer_name_parts) >= 2:
+                                buyer_name = ' '.join(buyer_name_parts[:2])
+                            else:
+                                buyer_name = buyer_line
+                        continue
+                    # Extract SKU and Quantity
+                    if 'TITEL' in line and 'ARTIKELNUMMER' in line:
+                        # Process the lines after this header
+                        for j in range(i + 1, len(lines)):
+                            data_line = lines[j].strip()
+                            if not data_line:
+                                continue
+                            # Check if line contains SKU
+                            if re.match(r'^[A-Z0-9.-]{5,}$', data_line):
+                                sku = data_line
+                                # Now look for quantity
+                                quantity_found = False
+                                for k in range(j, j + 5):
+                                    if k >= len(lines):
+                                        break
+                                    line_to_check = lines[k].strip()
+                                    if not line_to_check:
+                                        continue
+                                    # Look for pattern: number before percentage sign
+                                    qty_match = re.search(r'\b(\d+)\b\s*\d+%.*', line_to_check)
+                                    if qty_match:
+                                        quantity = qty_match.group(1)
+                                        quantity_found = True
+                                        break
+                                if not quantity_found:
+                                    quantity = ''
+                                break
+                        continue
+                return {
+                    'Order number': order_number,
+                    'Order date': order_date,
+                    'Buyer\'s name': buyer_name,
+                    'SKU': sku,
+                    'Quantity': quantity,
+                    'Delivery service': 'Unknown'
+                }
+
+            data = extract_data_from_text(text)
+            data_list.append(data)
+
+            # Delete the temporary file
+            default_storage.delete(temp_pdf_path)
+
+        if not data_list:
+            return render(request, 'locator/upload_and_download.html', {
+                'error_message_new': 'No data extracted.'
+            })
+        else:
+            # Create DataFrame and save to Excel
+            df = pd.DataFrame(data_list)
+            excel_file_name = 'new_output.xlsx'
+            excel_file_path = os.path.join(settings.MEDIA_ROOT, excel_file_name)
+            df.to_excel(excel_file_path, index=False)
+            new_excel_file_url = settings.MEDIA_URL + excel_file_name
+            return render(request, 'locator/upload_and_download.html', {
+                'new_excel_file_url': new_excel_file_url
             })
     else:
         return render(request, 'locator/upload_and_download.html')

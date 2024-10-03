@@ -68,6 +68,47 @@
                             <a href="{{ mano_excel_file_url }}" class="alert-link d-block mt-2">Download Mano Excel File</a>
                         </div>
                     {% endif %}
+                                        <!-- Fourth form: New functionality -->
+                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_new_functionality' %}" class="mt-auto">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="pdfFilesNew">Choose PDF Files for New Functionality</label>
+                            <input type="file" class="form-control-file" id="pdfFilesNew" name="pdf_files_new" accept=".pdf" multiple required>
+                        </div>
+                        <button type="submit" class="btn btn-secondary btn-block">Process with New Functionality</button>
+                    </form>
+
+                    {% if new_excel_file_url %}
+                        <div class="alert alert-success mt-3">
+                            <strong>Success!</strong> Your Excel file is ready.
+                            <a href="{{ new_excel_file_url }}" class="alert-link d-block mt-2">Download New Excel File</a>
+                        </div>
+                    {% endif %}
+
+                    <!-- Error Messages -->
+                    {% if error_message %}
+                        <div class="alert alert-danger mt-3">
+                            <strong>Error:</strong> {{ error_message }}
+                        </div>
+                    {% endif %}
+                    {% if error_message_home24 %}
+                        <div class="alert alert-danger mt-3">
+                            <strong>Error:</strong> {{ error_message_home24 }}
+                        </div>
+                    {% endif %}
+                    {% if error_message_mano %}
+                        <div class="alert alert-danger mt-3">
+                            <strong>Error:</strong> {{ error_message_mano }}
+                        </div>
+                    {% endif %}
+                    {% if error_message_new %}
+                        <div class="alert alert-danger mt-3">
+                            <strong>Error:</strong> {{ error_message_new }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
 
                     <!-- Error Messages -->
                     {% if error_message %}
