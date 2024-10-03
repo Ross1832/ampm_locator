@@ -1,3 +1,4 @@
+<!-- upload_and_download.html -->
 
 {% extends 'locator/base.html' %}
 
@@ -17,8 +18,10 @@
                     <h2 class="h5 mb-0">Convert PDFs to Excel</h2>
                 </div>
                 <div class="card-body d-flex flex-column">
-                    <p>Upload your PDF order files and convert them to Excel format.</p>
-                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs' %}" class="mt-auto">
+                    <p>Upload your PDF order files and choose a processing method to convert them to Excel format.</p>
+
+                    <!-- First form: Existing functionality -->
+                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs' %}" class="mt-auto mb-2">
                         {% csrf_token %}
                         <div class="form-group">
                             <label for="pdfFiles">Choose PDF Files</label>
@@ -31,6 +34,23 @@
                         <div class="alert alert-success mt-3">
                             <strong>Success!</strong> Your Excel file is ready.
                             <a href="{{ excel_file_url }}" class="alert-link d-block mt-2">Download Excel File</a>
+                        </div>
+                    {% endif %}
+
+                    <!-- Second form: Your functionality -->
+                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_home24' %}" class="mt-auto">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="pdfFilesHome24">Choose PDF Files</label>
+                            <input type="file" class="form-control-file" id="pdfFilesHome24" name="pdf_files" accept=".pdf" multiple required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Process with Home24</button>
+                    </form>
+
+                    {% if home24_excel_file_url %}
+                        <div class="alert alert-success mt-3">
+                            <strong>Success!</strong> Your Home24 Excel file is ready.
+                            <a href="{{ home24_excel_file_url }}" class="alert-link d-block mt-2">Download Home24 Excel File</a>
                         </div>
                     {% endif %}
 
@@ -72,3 +92,5 @@
     </div>
 </div>
 {% endblock %}
+
+

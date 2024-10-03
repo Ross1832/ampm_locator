@@ -33,5 +33,5 @@ urlpatterns = [
     path('upload-and-download/', upload_and_download, name='upload_and_download'),
     path('upload_pdfs/', upload_pdfs, name='upload_pdfs'),
     path('aggregate-skus/', aggregate_skus, name='aggregate_skus'),
-    path('upload_pdfs/', upload_pdfs_home24, name='upload_pdfs'),
+    path('upload_pdfs/', upload_pdfs_home24, name='upload_pdfs_home24'),
 ]
