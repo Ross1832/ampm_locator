@@ -9,7 +9,7 @@
     </div>
 
     <div class="row mt-4">
-        <!-- PDF to Excel Form -->
+        <!-- Left Column -->
         <div class="col-md-6 mb-4">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-success text-white">
@@ -40,7 +40,7 @@
                         {% csrf_token %}
                         <div class="form-group">
                             <label for="pdfFilesHome24">Choose PDF Files for Home24</label>
-                            <input type="file" class="form-control-file" id="pdfFilesHome24" name="pdf_files" accept=".pdf" multiple required>
+                            <input type="file" class="form-control-file" id="pdfFilesHome24" name="pdf_files_home24" accept=".pdf" multiple required>
                         </div>
                         <button type="submit" class="btn btn-primary btn-block">Process with Home24</button>
                     </form>
@@ -53,7 +53,7 @@
                     {% endif %}
 
                     <!-- Third form: Mano functionality -->
-                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_mano' %}" class="mt-auto">
+                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_mano' %}" class="mt-auto mb-2">
                         {% csrf_token %}
                         <div class="form-group">
                             <label for="pdfFilesMano">Choose PDF Files for Mano</label>
@@ -68,14 +68,15 @@
                             <a href="{{ mano_excel_file_url }}" class="alert-link d-block mt-2">Download Mano Excel File</a>
                         </div>
                     {% endif %}
-                                        <!-- Fourth form: New functionality -->
+
+                    <!-- Fourth form: AMPM functionality -->
                     <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_new_functionality' %}" class="mt-auto">
                         {% csrf_token %}
                         <div class="form-group">
                             <label for="pdfFilesNew">Choose PDF Files for New Functionality</label>
                             <input type="file" class="form-control-file" id="pdfFilesNew" name="pdf_files_new" accept=".pdf" multiple required>
                         </div>
-                        <button type="submit" class="btn btn-secondary btn-block">Process with New Functionality</button>
+                        <button type="submit" class="btn btn-secondary btn-block">Process with AMPM</button>
                     </form>
 
                     {% if new_excel_file_url %}
@@ -110,27 +111,7 @@
             </div>
         </div>
 
-                    <!-- Error Messages -->
-                    {% if error_message %}
-                        <div class="alert alert-danger mt-3">
-                            <strong>Error:</strong> {{ error_message }}
-                        </div>
-                    {% endif %}
-                    {% if error_message_home24 %}
-                        <div class="alert alert-danger mt-3">
-                            <strong>Error:</strong> {{ error_message_home24 }}
-                        </div>
-                    {% endif %}
-                    {% if error_message_mano %}
-                        <div class="alert alert-danger mt-3">
-                            <strong>Error:</strong> {{ error_message_mano }}
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- SKU Aggregation Form -->
+        <!-- Right Column -->
         <div class="col-md-6 mb-4">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-info text-white">
@@ -156,8 +137,6 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
+    </div> <!-- Closes row -->
+</div> <!-- Closes container -->
 {% endblock %}
-
-
