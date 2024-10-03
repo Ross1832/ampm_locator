@@ -829,3 +829,23 @@ def upload_pdfs_new_functionality(request):
         </html>
         '''
         return HttpResponse(html_form)
+
+
+def upload_and_download(request):
+    if request.method == 'POST':
+        if 'home24_submit' in request.POST and request.FILES.getlist('pdf_files_home24'):
+            # Handle Home24 form submission
+            return upload_pdfs_home24(request)
+        elif 'mano_submit' in request.POST and request.FILES.getlist('pdf_files_mano'):
+            # Handle Mano form submission
+            return upload_pdfs_mano(request)
+        elif 'ampm_submit' in request.POST and request.FILES.getlist('pdf_files_new'):
+            # Handle AMPM form submission
+            return upload_pdfs_new_functionality(request)
+        elif 'existing_submit' in request.POST and request.FILES.getlist('pdf_files'):
+            # Handle existing functionality
+            return upload_pdfs(request)
+        # ... handle other forms ...
+    else:
+        # Render your upload and download template
+        return render(request, 'locator/upload_and_download.html')
