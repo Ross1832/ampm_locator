@@ -390,8 +390,8 @@ def aggregate_skus(request):
 #### home24
 
 def upload_pdfs_home24(request):
-    if request.method == 'POST':
-        pdf_files = request.FILES.getlist('pdf_files')
+    if request.method == 'POST' and request.FILES.getlist('pdf_files_home24'):
+        pdf_files = request.FILES.getlist('pdf_files_home24')
         all_orders = []
 
         for pdf_file in pdf_files:
@@ -469,26 +469,48 @@ def upload_pdfs_home24(request):
                 print(f"No orders found in {pdf_file.name}")
             all_orders.extend(orders)
         if not all_orders:
-            return render(request, 'locator/base.html', {
-                'error_message': 'No orders were extracted. Please check the PDF files and the extraction logic.'
-            })
+            return HttpResponse('No orders were extracted. Please check the PDF files and the extraction logic.')
+
         # Create DataFrame and write to Excel
         df = pd.DataFrame(all_orders)
         # Reorder columns as specified
         df = df[['Order number', 'Order date', "Buyer's name", 'SKU', 'Quantity', 'Delivery service']]
-        # Save the Excel file
-        excel_file_name = 'orders.xlsx'
-        excel_file_path = os.path.join(settings.MEDIA_ROOT, excel_file_name)
-        df.to_excel(excel_file_path, index=False)
-        excel_file_url = settings.MEDIA_URL + excel_file_name
-        return render(request, 'locator/upload_and_download.html', {'excel_file_url': excel_file_url})
+
+        # Save the Excel file to an in-memory stream
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False)
+        output.seek(0)
+
+        # Prepare response to download the file
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename=home24_orders_{uuid.uuid4().hex}.xlsx'
+
+        return response
     else:
-        return render(request, 'locator/upload_and_download.html')
+        # If GET request or no files uploaded, render the upload page
+        html_form = '''
+        <!DOCTYPE html>
+        <html>
+        <body>
+        <h2>Upload PDFs for Home24</h2>
+        <form action="" method="post" enctype="multipart/form-data">
+            <!-- {% csrf_token %} -->
+            <input type="file" name="pdf_files" multiple required>
+            <input type="submit" value="Upload">
+        </form>
+        </body>
+        </html>
+        '''
+        return HttpResponse(html_form)
 
 
 ### mano
 def upload_pdfs_mano(request):
-    if request.method == 'POST':
+    if request.method == 'POST' and request.FILES.getlist('pdf_files_mano'):
         pdf_files = request.FILES.getlist('pdf_files_mano')
         all_orders = []
 
@@ -508,9 +530,6 @@ def upload_pdfs_mano(request):
                             text += page_text + '\n'
                         else:
                             print(f"No text found on page {page_num} of {pdf_path}")
-                # Optionally save extracted text for debugging
-                # with open('extracted_text.txt', 'w', encoding='utf-8') as f:
-                #     f.write(text)
                 return text
 
             # Parse orders from text
@@ -636,26 +655,47 @@ def upload_pdfs_mano(request):
                 all_orders.extend(orders)
 
         if not all_orders:
-            return render(request, 'locator/upload_and_download.html', {
-                'error_message_mano': 'No orders extracted.'
-            })
-        else:
-            # Create DataFrame and save to Excel
-            df = pd.DataFrame(all_orders)
-            excel_file_name = 'mano_orders.xlsx'
-            excel_file_path = os.path.join(settings.MEDIA_ROOT, excel_file_name)
-            df.to_excel(excel_file_path, index=False)
-            mano_excel_file_url = settings.MEDIA_URL + excel_file_name
-            return render(request, 'locator/upload_and_download.html', {
-                'mano_excel_file_url': mano_excel_file_url
-            })
+            return HttpResponse('No orders extracted from the uploaded PDFs.')
+
+        # Create DataFrame and save to Excel
+        df = pd.DataFrame(all_orders)
+
+        # Save the Excel file to an in-memory stream
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False)
+        output.seek(0)
+
+        # Prepare response to download the file
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename=mano_orders_{uuid.uuid4().hex}.xlsx'
+
+        return response
     else:
-        return render(request, 'locator/upload_and_download.html')
+        # If GET request or no files uploaded, render the upload page
+        html_form = '''
+        <!DOCTYPE html>
+        <html>
+        <body>
+        <h2>Upload PDFs for Mano</h2>
+        <form action="" method="post" enctype="multipart/form-data">
+            <!-- {% csrf_token %} -->
+            <input type="file" name="pdf_files_mano" multiple required>
+            <input type="submit" value="Upload">
+        </form>
+        </body>
+        </html>
+        '''
+        return HttpResponse(html_form)
+
 
 
 #ampm
 def upload_pdfs_new_functionality(request):
-    if request.method == 'POST':
+    if request.method == 'POST' and request.FILES.getlist('pdf_files_new'):
         pdf_files = request.FILES.getlist('pdf_files_new')
         data_list = []
 
@@ -675,11 +715,6 @@ def upload_pdfs_new_functionality(request):
                         text += page_text + '\n'
                     else:
                         text += f'[Page {page_num} has no extractable text]\n'
-
-            # Optionally write the extracted text to a text file for debugging
-            # text_filename = pdf_file.name.replace('.pdf', '.txt')
-            # with open(os.path.join(settings.MEDIA_ROOT, text_filename), 'w', encoding='utf-8') as f:
-            #     f.write(text)
 
             # Extract data using the function
             def extract_data_from_text(text):
@@ -759,18 +794,38 @@ def upload_pdfs_new_functionality(request):
             default_storage.delete(temp_pdf_path)
 
         if not data_list:
-            return render(request, 'locator/upload_and_download.html', {
-                'error_message_new': 'No data extracted.'
-            })
-        else:
-            # Create DataFrame and save to Excel
-            df = pd.DataFrame(data_list)
-            excel_file_name = 'new_output.xlsx'
-            excel_file_path = os.path.join(settings.MEDIA_ROOT, excel_file_name)
-            df.to_excel(excel_file_path, index=False)
-            new_excel_file_url = settings.MEDIA_URL + excel_file_name
-            return render(request, 'locator/upload_and_download.html', {
-                'new_excel_file_url': new_excel_file_url
-            })
+            return HttpResponse('No data extracted from the uploaded PDFs.')
+
+        # Create DataFrame and save to Excel
+        df = pd.DataFrame(data_list)
+
+        # Save the Excel file to an in-memory stream
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False)
+        output.seek(0)
+
+        # Prepare response to download the file
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename=ampm_orders_{uuid.uuid4().hex}.xlsx'
+
+        return response
     else:
-        return render(request, 'locator/upload_and_download.html')
+        # If GET request or no files uploaded, render the upload page
+        html_form = '''
+        <!DOCTYPE html>
+        <html>
+        <body>
+        <h2>Upload PDFs for AMPM</h2>
+        <form action="" method="post" enctype="multipart/form-data">
+            <!-- {% csrf_token %} -->
+            <input type="file" name="pdf_files_new" multiple required>
+            <input type="submit" value="Upload">
+        </form>
+        </body>
+        </html>
+        '''
+        return HttpResponse(html_form)
