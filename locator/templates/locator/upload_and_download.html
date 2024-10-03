@@ -1,5 +1,3 @@
-<!-- upload_and_download.html -->
-
 {% extends 'locator/base.html' %}
 
 {% block content %}
@@ -37,11 +35,11 @@
                         </div>
                     {% endif %}
 
-                    <!-- Second form: Your functionality -->
-                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_home24' %}" class="mt-auto">
+                    <!-- Second form: Home24 functionality -->
+                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_home24' %}" class="mt-auto mb-2">
                         {% csrf_token %}
                         <div class="form-group">
-                            <label for="pdfFilesHome24">Choose PDF Files</label>
+                            <label for="pdfFilesHome24">Choose PDF Files for Home24</label>
                             <input type="file" class="form-control-file" id="pdfFilesHome24" name="pdf_files" accept=".pdf" multiple required>
                         </div>
                         <button type="submit" class="btn btn-primary btn-block">Process with Home24</button>
@@ -54,9 +52,37 @@
                         </div>
                     {% endif %}
 
+                    <!-- Third form: Mano functionality -->
+                    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_mano' %}" class="mt-auto">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="pdfFilesMano">Choose PDF Files for Mano</label>
+                            <input type="file" class="form-control-file" id="pdfFilesMano" name="pdf_files_mano" accept=".pdf" multiple required>
+                        </div>
+                        <button type="submit" class="btn btn-warning btn-block">Process with Mano</button>
+                    </form>
+
+                    {% if mano_excel_file_url %}
+                        <div class="alert alert-success mt-3">
+                            <strong>Success!</strong> Your Mano Excel file is ready.
+                            <a href="{{ mano_excel_file_url }}" class="alert-link d-block mt-2">Download Mano Excel File</a>
+                        </div>
+                    {% endif %}
+
+                    <!-- Error Messages -->
                     {% if error_message %}
                         <div class="alert alert-danger mt-3">
                             <strong>Error:</strong> {{ error_message }}
+                        </div>
+                    {% endif %}
+                    {% if error_message_home24 %}
+                        <div class="alert alert-danger mt-3">
+                            <strong>Error:</strong> {{ error_message_home24 }}
+                        </div>
+                    {% endif %}
+                    {% if error_message_mano %}
+                        <div class="alert alert-danger mt-3">
+                            <strong>Error:</strong> {{ error_message_mano }}
                         </div>
                     {% endif %}
                 </div>

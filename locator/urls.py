@@ -4,7 +4,7 @@ from .convert_csv_to_excel import upload_and_download
 from .views import (CompleteOrderView, HoldOrderView, OrderListView,
                     collect_items, fetch_model_numbers, finalize_items,
                     select_model, set_item, update_order_status, upload_items,
-                    upload_orders, upload_pdfs, aggregate_skus, upload_pdfs_home24)
+                    upload_orders, upload_pdfs, aggregate_skus, upload_pdfs_home24, upload_pdfs_mano)
 
 urlpatterns = [
     path("", set_item, name="set_item"),
@@ -34,4 +34,5 @@ urlpatterns = [
     path('upload_pdfs/', upload_pdfs, name='upload_pdfs'),
     path('aggregate-skus/', aggregate_skus, name='aggregate_skus'),
     path('upload_pdfs/', upload_pdfs_home24, name='upload_pdfs_home24'),
+    path('upload_pdfs_mano/', upload_pdfs_mano, name='upload_pdfs_mano'),
 ]

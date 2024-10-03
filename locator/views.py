@@ -484,3 +484,171 @@ def upload_pdfs_home24(request):
         return render(request, 'locator/upload_and_download.html', {'excel_file_url': excel_file_url})
     else:
         return render(request, 'locator/upload_and_download.html')
+
+
+### mano
+
+def upload_pdfs_mano(request):
+    if request.method == 'POST':
+        pdf_files = request.FILES.getlist('pdf_files_mano')
+        all_orders = []
+
+        for pdf_file in pdf_files:
+            # Save the uploaded file temporarily
+            temp_pdf_path = default_storage.save('temp/' + pdf_file.name, ContentFile(pdf_file.read()))
+            pdf_full_path = default_storage.path(temp_pdf_path)
+            print(f"Processing file: {pdf_full_path}")
+
+            # Extract text from PDF
+            def extract_text_from_pdf(pdf_path):
+                text = ''
+                with pdfplumber.open(pdf_path) as pdf:
+                    for page_num, page in enumerate(pdf.pages, start=1):
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + '\n'
+                        else:
+                            print(f"No text found on page {page_num} of {pdf_path}")
+                # Optionally save extracted text for debugging
+                # with open('extracted_text.txt', 'w', encoding='utf-8') as f:
+                #     f.write(text)
+                return text
+
+            # Parse orders from text
+            def parse_orders(text):
+                # Use regex to split on the splitting phrase, ignoring extra whitespace
+                orders = re.split(r'Vielen Dank für Ihre Bestellung beim Verkäufer AM\.PM Europe GmbH\s*', text)
+                # Remove the first element if it's empty
+                if not orders[0].strip():
+                    orders = orders[1:]
+                parsed_orders = []
+                for order_text in orders:
+                    order_data = parse_order(order_text)
+                    if order_data:
+                        parsed_orders.extend(order_data)
+                return parsed_orders
+
+            # Parse individual order
+            def parse_order(order_text):
+                order_data = []
+                lines = [line.strip() for line in order_text.strip().split('\n')]
+                if not lines:
+                    return order_data
+                # Extract order number
+                order_number = lines[0]
+                print(f"Processing Order Number: {order_number}")
+                # Combine lines into a single string
+                order_text_combined = ' '.join(lines)
+                # Extract order date and delivery service
+                date_delivery_pattern = r'Bestelldatum Lieferzeit Träger\s*(\d{2}\.\d{2}\.\d{2}, \d{2}:\d{2})\s*(\d+\s*Tage)?\s*([\w\(\)]+)'
+                date_delivery_match = re.search(date_delivery_pattern, order_text_combined)
+                if date_delivery_match:
+                    order_date = date_delivery_match.group(1)
+                    delivery_time = date_delivery_match.group(2) or ''
+                    delivery_service = date_delivery_match.group(3) or ''
+                else:
+                    order_date = ''
+                    delivery_service = ''
+                print(f"Order Date: {order_date}, Delivery Service: {delivery_service}")
+                # Extract buyer's name
+                buyer_name = ''
+                # Find the line containing 'Kunden-Details'
+                idx = -1
+                for i, line in enumerate(lines):
+                    if 'Kunden-Details' in line:
+                        idx = i
+                        break
+                if idx == -1:
+                    buyer_name = ''
+                else:
+                    # Start from the line after 'Kunden-Details'
+                    i = idx + 1
+                    while i < len(lines):
+                        line = lines[i]
+                        # Skip lines that are labels or empty
+                        if line.strip() == '' or any(keyword in line for keyword in [
+                            'Unternehmen', 'Lieferanschrift', 'Mehrwertsteuersatz',
+                            'Haftung für Rechnungen', 'Ausstehende', 'Hausnr.', 'Straße +', 'nungsstellung', 'Hausnr.'
+                        ]):
+                            i += 1
+                            continue
+                        # If line contains phone number and name
+                        phone_name_match = re.match(r'\+[\d]+\s+(.+)', line)
+                        if phone_name_match:
+                            name_part = phone_name_match.group(1).strip()
+                            # Remove duplicate words
+                            name_words = name_part.split()
+                            seen = set()
+                            unique_name_words = []
+                            for word in name_words:
+                                if word not in seen:
+                                    seen.add(word)
+                                    unique_name_words.append(word)
+                            buyer_name = ' '.join(unique_name_words)
+                            break
+                        # If line starts with a name followed by a phone number
+                        name_phone_match = re.match(r'(.+?)\s+\+[\d]+', line)
+                        if name_phone_match:
+                            buyer_name = name_phone_match.group(1).strip()
+                            break
+                        # If line is just a phone number, skip it
+                        if re.match(r'\+[\d]+$', line):
+                            i += 1
+                            continue
+                        # Assume the line is the buyer's name
+                        buyer_name = line.strip()
+                        break
+                        i += 1
+                print(f"Buyer's Name: {buyer_name}")
+                # Extract items
+                item_pattern = r'Referenz SKU Menge\s*([\s\S]+?)VAT Excl VAT'
+                item_match = re.search(item_pattern, order_text)
+                if item_match:
+                    items_text = item_match.group(1)
+                    # Find all SKUs and Quantities
+                    sku_quantity_pattern = r'\b([A-Z0-9]+)\b\s+(\d+)\b'
+                    matches = re.findall(sku_quantity_pattern, items_text)
+                    for sku, quantity in matches:
+                        order_data.append({
+                            'Order number': order_number,
+                            'Order date': order_date,
+                            'Buyer\'s name': buyer_name,
+                            'SKU': sku,
+                            'Quantity': quantity,
+                            'Delivery service': delivery_service
+                        })
+                        print(f"Extracted Item: SKU={sku}, Quantity={quantity}")
+                else:
+                    print("No items found in this order.")
+                return order_data
+
+            # Begin processing the PDF file
+            text = extract_text_from_pdf(pdf_full_path)
+            # Delete the temporary file
+            default_storage.delete(temp_pdf_path)
+
+            if not text.strip():
+                print(f"No text extracted from {pdf_full_path}.")
+                continue
+            orders = parse_orders(text)
+            if not orders:
+                print(f"No orders found in {pdf_file.name}.")
+            else:
+                all_orders.extend(orders)
+
+        if not all_orders:
+            return render(request, 'locator/upload_and_download.html', {
+                'error_message_mano': 'No orders extracted.'
+            })
+        else:
+            # Create DataFrame and save to Excel
+            df = pd.DataFrame(all_orders)
+            excel_file_name = 'mano_orders.xlsx'
+            excel_file_path = os.path.join(settings.MEDIA_ROOT, excel_file_name)
+            df.to_excel(excel_file_path, index=False)
+            mano_excel_file_url = settings.MEDIA_URL + excel_file_name
+            return render(request, 'locator/upload_and_download.html', {
+                'mano_excel_file_url': mano_excel_file_url
+            })
+    else:
+        return render(request, 'locator/upload_and_download.html')
