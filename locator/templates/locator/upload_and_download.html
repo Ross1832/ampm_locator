@@ -29,7 +29,7 @@
 </form>
 
 <!-- Second form: Home24 functionality -->
-<form method="post" enctype="multipart/form-data" action="" class="mt-auto mb-2">
+<form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_home24' %}" class="mt-auto mb-2">
     {% csrf_token %}
     <div class="form-group">
         <label for="pdfFilesHome24">Choose PDF Files for Home24</label>

@@ -437,12 +437,9 @@ def upload_pdfs_home24(request):
                     if match:
                         order['SKU'] = match.group(1).strip()
                         # Extract Quantity
-                        # Split the order_text into lines for processing
                         lines = order_text.split('\n')
-                        # Find the index of the line containing 'Shop-Referenz:'
                         for i, line in enumerate(lines):
                             if 'Shop-Referenz:' in line:
-                                # Look for the next non-empty line containing only digits
                                 for j in range(i + 1, len(lines)):
                                     quantity_line = lines[j].strip()
                                     if quantity_line.isdigit():
@@ -451,11 +448,9 @@ def upload_pdfs_home24(request):
                                     elif quantity_line == '':
                                         continue
                                     else:
-                                        # If a non-digit line is encountered, default to '1'
                                         order['Quantity'] = '1'
                                         break
                                 else:
-                                    # If loop completes without finding quantity, default to '1'
                                     order['Quantity'] = '1'
                                 break
                     else:
@@ -491,21 +486,9 @@ def upload_pdfs_home24(request):
 
         return response
     else:
-        # If GET request or no files uploaded, render the upload page
-        html_form = '''
-        <!DOCTYPE html>
-        <html>
-        <body>
-        <h2>Upload PDFs for Home24</h2>
-        <form action="" method="post" enctype="multipart/form-data">
-            <!-- {% csrf_token %} -->
-            <input type="file" name="pdf_files" multiple required>
-            <input type="submit" value="Upload">
-        </form>
-        </body>
-        </html>
-        '''
-        return HttpResponse(html_form)
+        # If GET request or no files uploaded, redirect back to the main upload page
+        return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+
 
 
 ### mano
