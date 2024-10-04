@@ -19,14 +19,14 @@
                     <p>Upload your PDF order files and choose a processing method to convert them to Excel format.</p>
 
                    <!-- First form: Existing functionality -->
-<form method="post" enctype="multipart/form-data" action="" class="mt-auto mb-2">
-    {% csrf_token %}
-    <div class="form-group">
-        <label for="pdfFiles">Choose PDF Files</label>
-        <input type="file" class="form-control-file" id="pdfFiles" name="pdf_files" accept=".pdf" multiple required>
-    </div>
-    <button type="submit" name="existing_submit" class="btn btn-success btn-block">Upload and Convert PDFs</button>
-</form>
+    <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs' %}" class="mt-auto mb-2">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="pdfFiles">Choose PDF Files</label>
+            <input type="file" class="form-control-file" id="pdfFiles" name="pdf_files" accept=".pdf" multiple required>
+        </div>
+        <button type="submit" name="existing_submit" class="btn btn-success btn-block">Upload and Convert PDFs</button>
+    </form>
 
 <!-- Second form: Home24 functionality -->
 <form method="post" enctype="multipart/form-data" action="{% url 'upload_pdfs_home24' %}" class="mt-auto mb-2">

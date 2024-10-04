@@ -22,6 +22,8 @@ from .models import Item, Order, OrderItem
 from .utils import handle_update_file, handle_uploaded_file, process_excel_data
 import re
 from django.core.files.base import ContentFile
+from django.views.decorators.csrf import csrf_protect
+
 
 logger = logging.getLogger(__name__)
 
@@ -282,7 +284,7 @@ def upload_items(request): #upload items
 
 
 #pdf_all
-@csrf_exempt  # Use this decorator if you decide not to handle CSRF tokens in the form
+@csrf_exempt # Use this decorator if you decide not to handle CSRF tokens in the form
 def upload_pdfs(request):
     if request.method == 'POST' and request.FILES.getlist('pdf_files'):
         pdf_files = request.FILES.getlist('pdf_files')
