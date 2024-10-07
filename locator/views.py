@@ -435,14 +435,14 @@ def upload_pdfs_home24(request):
 
                     # Define patterns for each field in different languages
                     order_number_patterns = [
-                        r'Bestellnummer:\s*(.*)',          # German
-                        r'Numéro de commande\s*:\s*(.*)',  # French
-                        r'Bestelnummer:\s*(.*)',           # Dutch
+                        r'Bestellnummer:\s*([A-Za-z0-9-]+)',          # German
+                        r'Numéro de commande\s*:\s*([A-Za-z0-9-]+)',  # French
+                        r'Bestelnummer:\s*([A-Za-z0-9-]+)',           # Dutch
                     ]
                     order_date_patterns = [
-                        r'Bestelldatum:\s*(.*)',           # German
-                        r'Date de commande\s*:\s*(.*)',    # French
-                        r'Besteldatum:\s*(.*)',            # Dutch
+                        r'Bestelldatum:\s*([\d./-]+)',           # German
+                        r'Date de commande\s*:\s*([\d./-]+)',    # French
+                        r'Besteldatum:\s*([\d./-]+)',            # Dutch
                     ]
                     buyer_name_patterns = [
                         r'Name des Kunden:\s*(.*)',        # German
@@ -460,9 +460,9 @@ def upload_pdfs_home24(request):
                         r'Referentie shop:\s*(.*)',        # Dutch
                     ]
                     quantity_markers = [
-                        r'Anzahl',  # German
-                        r'Qté',     # French
-                        r'Aant\.',  # Dutch
+                        r'Anzahl',      # German
+                        r'Qté',         # French
+                        r'Aant\.',      # Dutch
                     ]
 
                     # Extract Order Number
@@ -475,22 +475,22 @@ def upload_pdfs_home24(request):
                     # Extract Order Date
                     order_date = get_field_value(order_text, order_date_patterns)
                     if order_date:
-                        order['Order date'] = order_date
+                        order['Order date'] = order_date.strip()
 
                     # Extract Buyer's Name
                     buyer_name = get_field_value(order_text, buyer_name_patterns)
                     if buyer_name:
-                        order["Buyer's name"] = buyer_name
+                        order["Buyer's name"] = buyer_name.strip()
 
                     # Extract Delivery Service
                     delivery_service = get_field_value(order_text, delivery_service_patterns)
                     if delivery_service:
-                        order['Delivery service'] = delivery_service
+                        order['Delivery service'] = delivery_service.strip()
 
                     # Extract SKU
                     sku = get_field_value(order_text, sku_patterns)
                     if sku:
-                        order['SKU'] = sku
+                        order['SKU'] = sku.strip()
                     else:
                         order['SKU'] = ''
 
@@ -550,8 +550,6 @@ def upload_pdfs_home24(request):
     else:
         # If GET request or no files uploaded, redirect back to the main upload page
         return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
-
-
 
 
 
