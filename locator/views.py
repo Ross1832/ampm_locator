@@ -412,53 +412,58 @@ def upload_pdfs_home24(request):
             # Extract orders from text
             def extract_orders_from_text(text):
                 orders = []
-                # Split orders by 'Lieferschein' keyword, assuming each order starts with it
-                order_texts = text.split('Lieferschein')
-                for order_text in order_texts[1:]:  # Skip the first split if it's before the first 'Lieferschein'
-                    order = {}
-                    # Extract Order Number
-                    match = re.search(r'Bestellnummer:\s*(.*)', order_text)
-                    if match:
-                        order['Order number'] = match.group(1).strip()
-                    else:
-                        continue  # Skip if no order number found
-                    # Extract Order Date
-                    match = re.search(r'Bestelldatum:\s*(.*)', order_text)
-                    if match:
-                        order['Order date'] = match.group(1).strip()
-                    # Extract Buyer's Name
-                    match = re.search(r'Name des Kunden:\s*(.*)', order_text)
-                    if match:
-                        order["Buyer's name"] = match.group(1).strip()
-                    # Extract Delivery Service
-                    match = re.search(r'Versandmethode:\s*(.*)', order_text)
-                    if match:
-                        order['Delivery service'] = match.group(1).strip()
-                    # Extract SKU and Quantity
-                    match = re.search(r'Shop-Referenz:\s*(.*)', order_text)
-                    if match:
-                        order['SKU'] = match.group(1).strip()
-                        # Extract Quantity
-                        lines = order_text.split('\n')
-                        for i, line in enumerate(lines):
-                            if 'Shop-Referenz:' in line:
-                                for j in range(i + 1, len(lines)):
-                                    quantity_line = lines[j].strip()
-                                    if quantity_line.isdigit():
-                                        order['Quantity'] = quantity_line
-                                        break
-                                    elif quantity_line == '':
-                                        continue
-                                    else:
-                                        order['Quantity'] = '1'
-                                        break
-                                else:
-                                    order['Quantity'] = '1'
+                lines = text.split('\n')
+
+                # Define field labels in multiple languages
+                FIELD_LABELS = {
+                    'Order number': [r'Bestellnummer', r'Numéro de commande', r'Bestelnummer', r'Order Number', r'Número de pedido'],
+                    'Order date': [r'Bestelldatum', r'Date de commande', r'Besteldatum', r'Order Date', r'Fecha de pedido'],
+                    "Buyer's name": [r'Name des Kunden', r'Nom de l\'acheteur', r'Klantnaam', r'Buyer\'s Name', r'Nombre del comprador'],
+                    'Delivery service': [r'Versandmethode', r'Mode de livraison', r'Verzendmethode', r'Delivery Service', r'Método de envío'],
+                    'SKU': [r'Shop-Referenz', r'Référence vendeur', r'Referentie shop', r'SKU', r'Referencia del vendedor'],
+                    'Quantity': [r'Qté', r'Aant.', r'Qty', r'Cantidad', r'Menge']
+                }
+
+                # Define order separators in multiple languages
+                ORDER_SEPARATORS = [r'Lieferschein', r'Bon de livraison', r'Leveringsbon', r'Delivery Note', r'Albarán']
+
+                current_order = {}
+                for i, line in enumerate(lines):
+                    # Check if line contains an order separator
+                    if any(separator in line for separator in ORDER_SEPARATORS):
+                        if current_order:
+                            orders.append(current_order)
+                            current_order = {}
+                        continue
+
+                    # Check for each field label
+                    for field, labels in FIELD_LABELS.items():
+                        for label in labels:
+                            pattern = rf'{label}\s*[:：]?\s*(.*)'
+                            match = re.match(pattern, line, re.IGNORECASE)
+                            if match:
+                                value = match.group(1).strip()
+                                current_order[field] = value
+                                break  # Stop checking other labels for this field
+                        else:
+                            continue  # Continue if no label matched
+                        break  # Stop checking other fields if a label matched
+
+                    # Special handling for Quantity (since it might be on the next line)
+                    if 'Quantity' not in current_order and any(qty_label in line for qty_label in FIELD_LABELS['Quantity']):
+                        # The quantity is often below the label, so look ahead
+                        for j in range(i + 1, min(i + 5, len(lines))):
+                            quantity_line = lines[j].strip()
+                            if quantity_line.isdigit():
+                                current_order['Quantity'] = quantity_line
                                 break
-                    else:
-                        order['SKU'] = ''
-                        order['Quantity'] = '1'  # Default quantity if SKU is not found
-                    orders.append(order)
+                        else:
+                            current_order['Quantity'] = '1'  # Default quantity
+
+                # Append the last order if not empty
+                if current_order:
+                    orders.append(current_order)
+
                 return orders
 
             orders = extract_orders_from_text(text)
@@ -490,6 +495,7 @@ def upload_pdfs_home24(request):
     else:
         # If GET request or no files uploaded, redirect back to the main upload page
         return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+
 
 
 
