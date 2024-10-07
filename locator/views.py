@@ -421,7 +421,7 @@ def upload_pdfs_home24(request):
                     "Buyer's name": [r'Name des Kunden', r'Nom de l\'acheteur', r'Klantnaam', r'Buyer\'s Name', r'Nombre del comprador'],
                     'Delivery service': [r'Versandmethode', r'Mode de livraison', r'Verzendmethode', r'Delivery Service', r'Método de envío'],
                     'SKU': [r'Shop-Referenz', r'Référence vendeur', r'Referentie shop', r'SKU', r'Referencia del vendedor'],
-                    'Quantity': [r'Qté', r'Aant.', r'Qty', r'Cantidad', r'Menge']
+                    'Quantity': [r'Qté', r'Aant\.', r'Qty', r'Cantidad', r'Menge']
                 }
 
                 # Define order separators in multiple languages
@@ -429,6 +429,7 @@ def upload_pdfs_home24(request):
 
                 current_order = {}
                 for i, line in enumerate(lines):
+                    line = line.strip()
                     # Check if line contains an order separator
                     if any(separator in line for separator in ORDER_SEPARATORS):
                         if current_order:
@@ -438,19 +439,22 @@ def upload_pdfs_home24(request):
 
                     # Check for each field label
                     for field, labels in FIELD_LABELS.items():
+                        if field == 'Quantity':
+                            continue  # Handle Quantity separately
                         for label in labels:
-                            pattern = rf'{label}\s*[:：]?\s*(.*)'
+                            pattern = rf'^\s*{re.escape(label)}\s*[:：]?\s*(.+)$'
                             match = re.match(pattern, line, re.IGNORECASE)
                             if match:
                                 value = match.group(1).strip()
-                                current_order[field] = value
+                                if field not in current_order:
+                                    current_order[field] = value
                                 break  # Stop checking other labels for this field
                         else:
                             continue  # Continue if no label matched
                         break  # Stop checking other fields if a label matched
 
-                    # Special handling for Quantity (since it might be on the next line)
-                    if 'Quantity' not in current_order and any(qty_label in line for qty_label in FIELD_LABELS['Quantity']):
+                    # Special handling for Quantity
+                    if 'Quantity' not in current_order and any(line == qty_label for qty_label in FIELD_LABELS['Quantity']):
                         # The quantity is often below the label, so look ahead
                         for j in range(i + 1, min(i + 5, len(lines))):
                             quantity_line = lines[j].strip()
@@ -495,6 +499,7 @@ def upload_pdfs_home24(request):
     else:
         # If GET request or no files uploaded, redirect back to the main upload page
         return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+
 
 
 
