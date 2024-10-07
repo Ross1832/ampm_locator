@@ -412,75 +412,113 @@ def upload_pdfs_home24(request):
             # Extract orders from text
             def extract_orders_from_text(text):
                 orders = []
-                lines = text.split('\n')
+                # Define order separators for different languages
+                order_separators = [
+                    'Lieferschein',        # German
+                    'Bon de livraison',    # French
+                    'Leveringsbon'         # Dutch
+                ]
+                # Create a regex pattern for order separators
+                order_separator_regex = r'(?i)(?:' + '|'.join(map(re.escape, order_separators)) + ')'
+                # Split text into individual orders
+                order_texts = re.split(order_separator_regex, text)
+                for order_text in order_texts[1:]:  # Skip text before the first order separator
+                    order = {}
 
-                # Define field labels in multiple languages
-                FIELD_LABELS = {
-                    'Order number': [r'Bestellnummer', r'Numéro de commande', r'Bestelnummer', r'Order Number', r'Número de pedido'],
-                    'Order date': [r'Bestelldatum', r'Date de commande', r'Besteldatum', r'Order Date', r'Fecha de pedido'],
-                    "Buyer's name": [r'Name des Kunden', r'Nom de l\'acheteur', r'Klantnaam', r'Buyer\'s Name', r'Nombre del comprador'],
-                    'Delivery service': [r'Versandmethode', r'Mode de livraison', r'Verzendmethode', r'Delivery Service', r'Método de envío'],
-                    'SKU': [r'Shop-Referenz', r'Référence vendeur', r'Referentie shop', r'SKU', r'Referencia del vendedor'],
-                    'Quantity': ['Qté', 'Aant.', 'Qty', 'Cantidad', 'Menge']
-                }
+                    # Helper function to get field value based on patterns
+                    def get_field_value(text, patterns):
+                        for pattern in patterns:
+                            match = re.search(pattern, text, re.I)
+                            if match:
+                                return match.group(1).strip()
+                        return None
 
-                # Define order separators in multiple languages
-                ORDER_SEPARATORS = [r'Lieferschein', r'Bon de livraison', r'Leveringsbon', r'Delivery Note', r'Albarán']
+                    # Define patterns for each field in different languages
+                    order_number_patterns = [
+                        r'Bestellnummer:\s*(.*)',          # German
+                        r'Numéro de commande\s*:\s*(.*)',  # French
+                        r'Bestelnummer:\s*(.*)',           # Dutch
+                    ]
+                    order_date_patterns = [
+                        r'Bestelldatum:\s*(.*)',           # German
+                        r'Date de commande\s*:\s*(.*)',    # French
+                        r'Besteldatum:\s*(.*)',            # Dutch
+                    ]
+                    buyer_name_patterns = [
+                        r'Name des Kunden:\s*(.*)',        # German
+                        r'Nom de l\'acheteur\s*:\s*(.*)',  # French
+                        r'Klantnaam:\s*(.*)',              # Dutch
+                    ]
+                    delivery_service_patterns = [
+                        r'Versandmethode:\s*(.*)',         # German
+                        r'Mode de livraison\s*:\s*(.*)',   # French
+                        r'Verzendmethode:\s*(.*)',         # Dutch
+                    ]
+                    sku_patterns = [
+                        r'Shop-Referenz:\s*(.*)',          # German
+                        r'Référence vendeur\s*:\s*(.*)',   # French
+                        r'Referentie shop:\s*(.*)',        # Dutch
+                    ]
+                    quantity_markers = [
+                        r'Anzahl',  # German
+                        r'Qté',     # French
+                        r'Aant\.',  # Dutch
+                    ]
 
-                current_order = {}
-                for i, line in enumerate(lines):
-                    line = line.strip()
-                    # Check if line contains an order separator
-                    if any(separator in line for separator in ORDER_SEPARATORS):
-                        if current_order:
-                            orders.append(current_order)
-                            current_order = {}
-                        continue
+                    # Extract Order Number
+                    order_number = get_field_value(order_text, order_number_patterns)
+                    if order_number:
+                        order['Order number'] = order_number
+                    else:
+                        continue  # Skip if no order number found
 
-                    # Check for each field label
-                    for field, labels in FIELD_LABELS.items():
-                        for label in labels:
-                            # For 'Quantity', handle the possibility that the value is on the next line
-                            if field == 'Quantity':
-                                pattern = rf'^{re.escape(label)}\s*[:：]?\s*(\d+)?$'
-                                match = re.match(pattern, line, re.IGNORECASE)
-                                if match:
-                                    value = match.group(1)
-                                    if value is None:
-                                        # Look ahead for the quantity value
-                                        for j in range(i + 1, min(i + 5, len(lines))):
-                                            quantity_line = lines[j].strip()
-                                            if quantity_line.isdigit():
-                                                value = quantity_line
-                                                break
+                    # Extract Order Date
+                    order_date = get_field_value(order_text, order_date_patterns)
+                    if order_date:
+                        order['Order date'] = order_date
+
+                    # Extract Buyer's Name
+                    buyer_name = get_field_value(order_text, buyer_name_patterns)
+                    if buyer_name:
+                        order["Buyer's name"] = buyer_name
+
+                    # Extract Delivery Service
+                    delivery_service = get_field_value(order_text, delivery_service_patterns)
+                    if delivery_service:
+                        order['Delivery service'] = delivery_service
+
+                    # Extract SKU
+                    sku = get_field_value(order_text, sku_patterns)
+                    if sku:
+                        order['SKU'] = sku
+                    else:
+                        order['SKU'] = ''
+
+                    # Extract Quantity
+                    quantity = '1'  # Default quantity
+                    lines = order_text.split('\n')
+                    for i, line in enumerate(lines):
+                        for marker in quantity_markers:
+                            if re.match(r'(?i)^' + marker + r'\s*$', line.strip()):
+                                # Next non-empty line is the quantity
+                                for next_line in lines[i + 1:]:
+                                    next_line = next_line.strip()
+                                    if next_line:
+                                        if next_line.isdigit():
+                                            quantity = next_line
                                         else:
-                                            value = '1'  # Default quantity
-                                    if field not in current_order:
-                                        current_order[field] = value.strip()
-                                    break  # Stop checking other labels for this field
-                            else:
-                                pattern = rf'^{re.escape(label)}\s*[:：]?\s*(.+)$'
-                                match = re.match(pattern, line, re.IGNORECASE)
-                                if match:
-                                    value = match.group(1).strip()
-                                    if field not in current_order:
-                                        current_order[field] = value
-                                    break  # Stop checking other labels for this field
+                                            # Check if quantity is in the same line
+                                            match = re.search(r'(\d+)', line)
+                                            if match:
+                                                quantity = match.group(1)
+                                        break
+                                break
                         else:
-                            continue  # Continue if no label matched
-                        break  # Stop checking other fields if a label matched
+                            continue
+                        break
+                    order['Quantity'] = quantity
 
-                # Append the last order if not empty
-                if current_order:
-                    orders.append(current_order)
-
-                # Ensure all fields are present in each order
-                required_fields = FIELD_LABELS.keys()
-                for order in orders:
-                    for field in required_fields:
-                        if field not in order:
-                            order[field] = ''
-
+                    orders.append(order)
                 return orders
 
             orders = extract_orders_from_text(text)
