@@ -460,7 +460,8 @@ def upload_pdfs_home24(request):
                         r'Referentie shop:\s*(.*)',        # Dutch
                     ]
                     quantity_markers = [
-                        r'Menge',      # German
+                        r'Anzahl',      # German
+                        r'Menge',       # German
                         r'Qté',         # French
                         r'Aant\.',      # Dutch
                     ]
@@ -550,6 +551,7 @@ def upload_pdfs_home24(request):
     else:
         # If GET request or no files uploaded, redirect back to the main upload page
         return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+
 
 
 
