@@ -397,35 +397,23 @@ def upload_pdfs_home24(request):
         all_orders = []
 
         for pdf_file in pdf_files:
-            # Save the uploaded file temporarily
             temp_pdf_path = default_storage.save('temp/' + pdf_file.name, ContentFile(pdf_file.read()))
-            # Process the PDF file
             text = ''
             with pdfplumber.open(default_storage.path(temp_pdf_path)) as pdf:
                 for page in pdf.pages:
                     page_text = page.extract_text()
                     if page_text:
                         text += page_text + '\n'
-            # Delete the temporary file
             default_storage.delete(temp_pdf_path)
 
-            # Extract orders from text
             def extract_orders_from_text(text):
                 orders = []
-                # Define order separators for different languages
-                order_separators = [
-                    'Lieferschein',        # German
-                    'Bon de livraison',    # French
-                    'Leveringsbon'         # Dutch
-                ]
-                # Create a regex pattern for order separators
+                order_separators = ['Lieferschein', 'Bon de livraison', 'Leveringsbon']
                 order_separator_regex = r'(?i)(?:' + '|'.join(map(re.escape, order_separators)) + ')'
-                # Split text into individual orders
                 order_texts = re.split(order_separator_regex, text)
-                for order_text in order_texts[1:]:  # Skip text before the first order separator
-                    order = {}
 
-                    # Helper function to get field value based on patterns
+                for order_text in order_texts[1:]:
+                    order = {}
                     def get_field_value(text, patterns):
                         for pattern in patterns:
                             match = re.search(pattern, text, re.I)
@@ -433,113 +421,69 @@ def upload_pdfs_home24(request):
                                 return match.group(1).strip()
                         return None
 
-                    # Define patterns for each field in different languages
-                    order_number_patterns = [
-                        r'Bestellnummer:\s*([A-Za-z0-9-]+)',          # German
-                        r'Numéro de commande\s*:\s*([A-Za-z0-9-]+)',  # French
-                        r'Bestelnummer:\s*([A-Za-z0-9-]+)',           # Dutch
-                    ]
-                    order_date_patterns = [
-                        r'Bestelldatum:\s*([\d./-]+)',           # German
-                        r'Date de commande\s*:\s*([\d./-]+)',    # French
-                        r'Besteldatum:\s*([\d./-]+)',            # Dutch
-                    ]
-                    buyer_name_patterns = [
-                        r'Name des Kunden:\s*(.*)',        # German
-                        r'Nom de l\'acheteur\s*:\s*(.*)',  # French
-                        r'Klantnaam:\s*(.*)',              # Dutch
-                    ]
-                    delivery_service_patterns = [
-                        r'Versandmethode:\s*(.*)',         # German
-                        r'Mode de livraison\s*:\s*(.*)',   # French
-                        r'Verzendmethode:\s*(.*)',         # Dutch
-                    ]
-                    sku_patterns = [
-                        r'Shop-Referenz:\s*(.*)',          # German
-                        r'Référence vendeur\s*:\s*(.*)',   # French
-                        r'Referentie shop:\s*(.*)',        # Dutch
-                    ]
-                    quantity_markers = [
-                        r'Anzahl',      # German
-                        r'Qté',         # French
-                        r'Aant\.',      # Dutch
-                    ]
+                    order_number_patterns = [r'Bestellnummer:\s*([A-Za-z0-9-]+)']
+                    order_date_patterns = [r'Bestelldatum:\s*([\d./-]+)']
+                    buyer_name_patterns = [r'Name des Kunden:\s*(.*)']
+                    delivery_service_patterns = [r'Versandmethode:\s*(.*)']
+                    sku_patterns = [r'Shop-Referenz:\s*(.*)']
+                    quantity_markers = [r'Anzahl', r'Qté', r'Aant\.']
 
-                    # Extract Order Number
                     order_number = get_field_value(order_text, order_number_patterns)
                     if order_number:
                         order['Order number'] = order_number
                     else:
-                        continue  # Skip if no order number found
+                        continue
 
-                    # Extract Order Date
                     order_date = get_field_value(order_text, order_date_patterns)
                     if order_date:
                         order['Order date'] = order_date.strip()
 
-                    # Extract Buyer's Name
                     buyer_name = get_field_value(order_text, buyer_name_patterns)
                     if buyer_name:
                         order["Buyer's name"] = buyer_name.strip()
 
-                    # Extract Delivery Service
                     delivery_service = get_field_value(order_text, delivery_service_patterns)
                     if delivery_service:
                         order['Delivery service'] = delivery_service.strip()
 
-                    # Extract SKU
-                    sku = get_field_value(order_text, sku_patterns)
-                    if sku:
-                        order['SKU'] = sku.strip()
-                    else:
-                        order['SKU'] = ''
-
-                    # Extract Quantity
-                    quantity = '1'  # Default quantity
                     lines = order_text.split('\n')
+                    current_skus = []
                     for i, line in enumerate(lines):
-                        for marker in quantity_markers:
-                            if re.match(r'(?i)^' + marker + r'\s*$', line.strip()):
-                                # Next non-empty line is the quantity
-                                for next_line in lines[i + 1:]:
-                                    next_line = next_line.strip()
-                                    if next_line:
-                                        if next_line.isdigit():
-                                            quantity = next_line
-                                        else:
-                                            # Check if quantity is in the same line
-                                            match = re.search(r'(\d+)', line)
-                                            if match:
-                                                quantity = match.group(1)
+                        sku = get_field_value(line, sku_patterns)
+                        if sku:
+                            quantity = '1'  # Default
+                            for marker in quantity_markers:
+                                if re.search(marker, lines[i + 1], re.I):
+                                    quantity_line = lines[i + 2] if lines[i + 2].strip().isdigit() else lines[i + 1]
+                                    quantity_match = re.search(r'(\d+)', quantity_line)
+                                    if quantity_match:
+                                        quantity = quantity_match.group(1)
                                         break
-                                break
-                        else:
-                            continue
-                        break
-                    order['Quantity'] = quantity
+                            current_skus.append({'SKU': sku.strip(), 'Quantity': quantity})
 
-                    orders.append(order)
+                    for sku_info in current_skus:
+                        order_copy = order.copy()
+                        order_copy.update(sku_info)
+                        orders.append(order_copy)
+
                 return orders
 
             orders = extract_orders_from_text(text)
             if not orders:
                 print(f"No orders found in {pdf_file.name}")
             all_orders.extend(orders)
+
         if not all_orders:
             return HttpResponse('No orders were extracted. Please check the PDF files and the extraction logic.')
 
-        # Create DataFrame and write to Excel
         df = pd.DataFrame(all_orders)
-        # Reorder columns as specified
         df = df[['Order number', 'Order date', "Buyer's name", 'SKU', 'Quantity', 'Delivery service']]
 
-        # Save the Excel file to an in-memory stream
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df.to_excel(writer, index=False)
         output.seek(0)
 
-        # Prepare response to download the file
         response = HttpResponse(
             output.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -548,8 +492,8 @@ def upload_pdfs_home24(request):
 
         return response
     else:
-        # If GET request or no files uploaded, redirect back to the main upload page
-        return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+        return redirect('upload_and_download')
+
 
 
 
