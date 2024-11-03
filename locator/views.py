@@ -426,7 +426,7 @@ def upload_pdfs_home24(request):
                     buyer_name_patterns = [r'Name des Kunden:\s*(.*)']
                     delivery_service_patterns = [r'Versandmethode:\s*(.*)']
                     sku_patterns = [r'Shop-Referenz:\s*(.*)']
-                    quantity_markers = [r'Anzahl', r'Qté', r'Aant\.']
+                    quantity_patterns = [r'Menge\s*:\s*(\d+)', r'Anzahl\s*:\s*(\d+)']
 
                     order_number = get_field_value(order_text, order_number_patterns)
                     if order_number:
@@ -451,14 +451,13 @@ def upload_pdfs_home24(request):
                     for i, line in enumerate(lines):
                         sku = get_field_value(line, sku_patterns)
                         if sku:
-                            quantity = '1'  # Default
-                            for marker in quantity_markers:
-                                if re.search(marker, lines[i + 1], re.I):
-                                    quantity_line = lines[i + 2] if lines[i + 2].strip().isdigit() else lines[i + 1]
-                                    quantity_match = re.search(r'(\d+)', quantity_line)
-                                    if quantity_match:
-                                        quantity = quantity_match.group(1)
-                                        break
+                            # Look for quantity around the SKU line
+                            quantity = '1'  # Default quantity if not found
+                            for j in range(i, min(i + 5, len(lines))):  # Check within 5 lines after SKU
+                                quantity_match = re.search(r'(\d+)', lines[j])
+                                if quantity_match:
+                                    quantity = quantity_match.group(1)
+                                    break
                             current_skus.append({'SKU': sku.strip(), 'Quantity': quantity})
 
                     for sku_info in current_skus:
@@ -493,9 +492,6 @@ def upload_pdfs_home24(request):
         return response
     else:
         return redirect('upload_and_download')
-
-
-
 
 
 ### mano
