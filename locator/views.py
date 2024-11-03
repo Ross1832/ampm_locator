@@ -496,19 +496,30 @@ def upload_pdfs_home24(request):
                         order['SKU'] = ''
 
                     # Extract Quantity
-                    quantity = '1'  # Default quantity if none found
-                    quantity_patterns = [
-                        r'Menge\s*[:\-]?\s*(\d+)',  # German quantity marker with potential trailing number
-                    ]
+                    quantity = None  # No default value
+                    lines = order_text.split('\n')
+                    for i, line in enumerate(lines):
+                        line_stripped = line.strip()
+                        for marker in quantity_markers:
+                            if re.search(r'(?i)\b' + re.escape(marker) + r'\b', line_stripped):
+                                # Now scan the next lines to find a number
+                                for next_line in lines[i + 1:]:
+                                    next_line_stripped = next_line.strip()
+                                    if next_line_stripped:
+                                        # Use regex to find a number in the line
+                                        match = re.search(r'(\d+)', next_line_stripped)
+                                        if match:
+                                            quantity = match.group(1)
+                                            print(f"Extracted quantity for order {order_number}: {quantity}")
+                                            break
+                                break  # Break the marker loop after processing the marker
+                        if quantity is not None:
+                            break  # Break the line loop if quantity is found
 
-                    # Look for quantity using defined patterns
-                    for pattern in quantity_patterns:
-                        match = re.search(pattern, order_text, re.I)
-                        if match:
-                            quantity = match.group(1)
-                            break  # Exit loop once quantity is found
-
-                    order['Quantity'] = quantity
+                    # Assign quantity to order
+                    order['Quantity'] = quantity if quantity is not None else ''
+                    # Debugging: Print the order dictionary
+                    print(f"Order details: {order}")
 
                     orders.append(order)
                 return orders
@@ -524,6 +535,9 @@ def upload_pdfs_home24(request):
         df = pd.DataFrame(all_orders)
         # Reorder columns as specified
         df = df[['Order number', 'Order date', "Buyer's name", 'SKU', 'Quantity', 'Delivery service']]
+
+        # Debugging: Print the DataFrame
+        print(df)
 
         # Save the Excel file to an in-memory stream
         output = io.BytesIO()
@@ -542,6 +556,7 @@ def upload_pdfs_home24(request):
     else:
         # If GET request or no files uploaded, redirect back to the main upload page
         return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+
 
 
 
