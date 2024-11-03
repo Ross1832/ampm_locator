@@ -499,24 +499,22 @@ def upload_pdfs_home24(request):
                     quantity = '1'  # Default quantity
                     lines = order_text.split('\n')
                     for i, line in enumerate(lines):
+                        line_stripped = line.strip()
                         for marker in quantity_markers:
-                            if re.match(r'(?i)^' + marker + r'\s*$', line.strip()):
-                                # Next non-empty line is the quantity
+                            if re.match(r'(?i)^' + marker + r'\s*$', line_stripped):
+                                # Now scan the next lines to find a digit
                                 for next_line in lines[i + 1:]:
-                                    next_line = next_line.strip()
-                                    if next_line:
-                                        if next_line.isdigit():
-                                            quantity = next_line
-                                        else:
-                                            # Check if quantity is in the same line
-                                            match = re.search(r'(\d+)', line)
-                                            if match:
-                                                quantity = match.group(1)
-                                        break
-                                break
+                                    next_line_stripped = next_line.strip()
+                                    if next_line_stripped:
+                                        # Remove any non-digit characters
+                                        next_line_digits = re.sub(r'\D', '', next_line_stripped)
+                                        if next_line_digits:
+                                            quantity = next_line_digits
+                                            break
+                                break  # Break the marker loop after processing the marker
                         else:
                             continue
-                        break
+                        break  # Break the line loop after processing the marker
                     order['Quantity'] = quantity
 
                     orders.append(order)
