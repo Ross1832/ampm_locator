@@ -496,27 +496,18 @@ def upload_pdfs_home24(request):
                         order['SKU'] = ''
 
                     # Extract Quantity
-                    quantity = '1'  # Default quantity
-                    lines = order_text.split('\n')
-                    for i, line in enumerate(lines):
-                        for marker in quantity_markers:
-                            if re.match(r'(?i)^' + marker + r'\s*$', line.strip()):
-                                # Next non-empty line is the quantity
-                                for next_line in lines[i + 1:]:
-                                    next_line = next_line.strip()
-                                    if next_line:
-                                        if next_line.isdigit():
-                                            quantity = next_line
-                                        else:
-                                            # Check if quantity is in the same line
-                                            match = re.search(r'(\d+)', line)
-                                            if match:
-                                                quantity = match.group(1)
-                                        break
-                                break
-                        else:
-                            continue
-                        break
+                    quantity = '1'  # Default quantity if none found
+                    quantity_patterns = [
+                        r'Menge\s*[:\-]?\s*(\d+)',  # German quantity marker with potential trailing number
+                    ]
+
+                    # Look for quantity using defined patterns
+                    for pattern in quantity_patterns:
+                        match = re.search(pattern, order_text, re.I)
+                        if match:
+                            quantity = match.group(1)
+                            break  # Exit loop once quantity is found
+
                     order['Quantity'] = quantity
 
                     orders.append(order)
