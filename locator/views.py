@@ -423,6 +423,7 @@ def upload_pdfs_home24(request):
                 # Split text into individual orders
                 order_texts = re.split(order_separator_regex, text)
                 for order_text in order_texts[1:]:  # Skip text before the first order separator
+                    # Initialize order dictionary
                     order = {}
 
                     # Helper function to get field value based on patterns
@@ -454,17 +455,6 @@ def upload_pdfs_home24(request):
                         r'Mode de livraison\s*:\s*(.*)',   # French
                         r'Verzendmethode:\s*(.*)',         # Dutch
                     ]
-                    sku_patterns = [
-                        r'Shop-Referenz:\s*(.*)',          # German
-                        r'Référence vendeur\s*:\s*(.*)',   # French
-                        r'Referentie shop:\s*(.*)',        # Dutch
-                    ]
-                    quantity_markers = [
-                        r'Anzahl',      # German
-                        r'Menge',       # German
-                        r'Qté',         # French
-                        r'Aant\.',      # Dutch
-                    ]
 
                     # Extract Order Number
                     order_number = get_field_value(order_text, order_number_patterns)
@@ -488,62 +478,63 @@ def upload_pdfs_home24(request):
                     if delivery_service:
                         order['Delivery service'] = delivery_service.strip()
 
-                    # Now, extract items
-                    # Get the text after 'Produktbeschreibung'
-                    items_section = order_text.split('Produktbeschreibung')[-1]
-                    # Split into items based on 'Produktname:'
-                    item_texts = items_section.split('Produktname:')[1:]  # Skip the first part before 'Produktname:'
+                    # Now, extract products
 
-                    # If no items found, continue
-                    if not item_texts:
+                    # Find the start of 'Produktbeschreibung'
+                    product_description_pattern = r'Produktbeschreibung'
+                    product_description_match = re.search(product_description_pattern, order_text, re.I)
+                    if product_description_match:
+                        product_text_start = product_description_match.end()
+                        product_text = order_text[product_text_start:]
+
+                        # Now, split the product_text into individual products based on 'Produktname'
+                        product_sections = re.split(r'Produktname:\s*', product_text)
+                        # The first split part before the first 'Produktname' is not a product, so skip it
+                        product_sections = product_sections[1:]
+
+                        multiple_products = len(product_sections) > 1
+
+                        # For single product, try to find 'Menge' in the order_text
+                        menge = ''
+                        if not multiple_products:
+                            menge_match = re.search(r'Menge\s+(\d+)', order_text, re.I)
+                            if menge_match:
+                                menge = menge_match.group(1)
+
+                        for product_section in product_sections:
+                            # Since 'Produktname:' was removed during split, add it back
+                            product_section = 'Produktname: ' + product_section
+
+                            product = {}
+                            # Extract SKU
+                            sku_match = re.search(r'Shop-Referenz:\s*(\S+)', product_section, re.I)
+                            if sku_match:
+                                sku = sku_match.group(1).strip()
+                                quantity = ''
+                                # For multiple products, extract last digit as quantity if SKU ends with digit
+                                if multiple_products and sku[-1].isdigit():
+                                    quantity = sku[-1]
+                                    sku = sku[:-1]
+                                else:
+                                    quantity = menge  # For single product
+                                product['SKU'] = sku
+                                product['Quantity'] = quantity
+                            else:
+                                product['SKU'] = ''
+                                product['Quantity'] = menge if not multiple_products else ''
+
+                            # Create order dictionary for this product
+                            order_product = order.copy()
+                            order_product['SKU'] = product['SKU']
+                            order_product['Quantity'] = product['Quantity']
+                            # Debugging: Print the order product dictionary
+                            print(f"Order product details: {order_product}")
+                            orders.append(order_product)
+                    else:
+                        # Could not find 'Produktbeschreibung', skip
+                        print("Could not find 'Produktbeschreibung' in order text")
                         continue
 
-                    for item_text in item_texts:
-                        item_order = order.copy()
-
-                        # Extract SKU
-                        sku = get_field_value(item_text, sku_patterns)
-                        if sku:
-                            sku = sku.strip()
-                            # Check if SKU ends with digit(s), which might be the quantity
-                            match = re.match(r'(.*?)(\d+)$', sku)
-                            if match and len(item_texts) > 1:
-                                sku_only = match.group(1)
-                                quantity = match.group(2)
-                            else:
-                                sku_only = sku
-                                quantity = ''
-                        else:
-                            sku_only = ''
-                            quantity = ''
-
-                        item_order['SKU'] = sku_only
-                        item_order['Quantity'] = quantity
-
-                        # If quantity is still empty, try to extract from 'Menge' markers
-                        if not quantity:
-                            # Search for quantity markers in the item_text
-                            lines = item_text.split('\n')
-                            for i, line in enumerate(lines):
-                                line_stripped = line.strip()
-                                for marker in quantity_markers:
-                                    if re.search(r'(?i)\b' + re.escape(marker) + r'\b', line_stripped):
-                                        # Now scan the next lines to find a number
-                                        for next_line in lines[i + 1:]:
-                                            next_line_stripped = next_line.strip()
-                                            if next_line_stripped:
-                                                # Use regex to find a number in the line
-                                                match = re.search(r'(\d+)', next_line_stripped)
-                                                if match:
-                                                    quantity = match.group(1)
-                                                    break
-                                        break  # Break the marker loop after processing the marker
-                                if quantity:
-                                    break  # Break the line loop if quantity is found
-                            item_order['Quantity'] = quantity if quantity else ''
-
-                        # Append item_order to orders
-                        orders.append(item_order)
                 return orders
 
             orders = extract_orders_from_text(text)
@@ -578,9 +569,6 @@ def upload_pdfs_home24(request):
     else:
         # If GET request or no files uploaded, redirect back to the main upload page
         return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
-
-
-
 
 
 
