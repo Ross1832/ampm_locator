@@ -406,8 +406,8 @@ def upload_pdfs_home24(request):
                     page_text = page.extract_text()
                     if page_text:
                         text += page_text + '\n'
-            # Delete the temporary file
-            default_storage.delete(temp_pdf_path)
+                # Delete the temporary file
+                default_storage.delete(temp_pdf_path)
 
             # Extract orders from text
             def extract_orders_from_text(text):
@@ -454,17 +454,6 @@ def upload_pdfs_home24(request):
                         r'Mode de livraison\s*:\s*(.*)',   # French
                         r'Verzendmethode:\s*(.*)',         # Dutch
                     ]
-                    sku_patterns = [
-                        r'Shop-Referenz:\s*(.*)',          # German
-                        r'Référence vendeur\s*:\s*(.*)',   # French
-                        r'Referentie shop:\s*(.*)',        # Dutch
-                    ]
-                    quantity_markers = [
-                        r'Anzahl',      # German
-                        r'Menge',       # German
-                        r'Qté',         # French
-                        r'Aant\.',      # Dutch
-                    ]
 
                     # Extract Order Number
                     order_number = get_field_value(order_text, order_number_patterns)
@@ -488,40 +477,68 @@ def upload_pdfs_home24(request):
                     if delivery_service:
                         order['Delivery service'] = delivery_service.strip()
 
-                    # Extract SKU
-                    sku = get_field_value(order_text, sku_patterns)
-                    if sku:
-                        order['SKU'] = sku.strip()
-                    else:
-                        order['SKU'] = ''
-
-                    # Extract Quantity
-                    quantity = None  # No default value
+                    # Now extract products
                     lines = order_text.split('\n')
+                    products = []
+                    quantity_markers = [
+                        r'Anzahl',      # German
+                        r'Menge',       # German
+                        r'Qté',         # French
+                        r'Aant\.',      # Dutch
+                    ]
+
+                    current_product = {}
+                    quantity = None
+
                     for i, line in enumerate(lines):
-                        line_stripped = line.strip()
-                        for marker in quantity_markers:
-                            if re.search(r'(?i)\b' + re.escape(marker) + r'\b', line_stripped):
-                                # Now scan the next lines to find a number
-                                for next_line in lines[i + 1:]:
-                                    next_line_stripped = next_line.strip()
-                                    if next_line_stripped:
-                                        # Use regex to find a number in the line
-                                        match = re.search(r'(\d+)', next_line_stripped)
-                                        if match:
-                                            quantity = match.group(1)
-                                            print(f"Extracted quantity for order {order_number}: {quantity}")
-                                            break
-                                break  # Break the marker loop after processing the marker
-                        if quantity is not None:
-                            break  # Break the line loop if quantity is found
+                        line = line.strip()
+                        # Check for SKU line
+                        if line.startswith('Shop-Referenz:'):
+                            sku = line.split('Shop-Referenz:')[1].strip()
+                            # Check if SKU ends with a digit (quantity appended)
+                            if sku and sku[-1].isdigit():
+                                quantity = sku[-1]
+                                sku = sku[:-1]
+                            else:
+                                quantity = ''
+                            current_product = {
+                                'SKU': sku,
+                                'Quantity': quantity
+                            }
+                            products.append(current_product)
+                        else:
+                            # Check for quantity markers
+                            for marker in quantity_markers:
+                                if re.search(r'(?i)\b' + re.escape(marker) + r'\b', line):
+                                    # Now scan the next lines to find a number
+                                    for next_line in lines[i + 1:]:
+                                        next_line = next_line.strip()
+                                        if next_line:
+                                            match = re.search(r'(\d+)', next_line)
+                                            if match:
+                                                quantity = match.group(1)
+                                                # Assign quantity to last product
+                                                if products:
+                                                    products[-1]['Quantity'] = quantity
+                                                break
+                                    break
 
-                    # Assign quantity to order
-                    order['Quantity'] = quantity if quantity is not None else ''
-                    # Debugging: Print the order dictionary
-                    print(f"Order details: {order}")
+                    # If no products found, skip this order
+                    if not products:
+                        continue
 
-                    orders.append(order)
+                    # For each product, create an order entry
+                    for product in products:
+                        order_entry = {
+                            'Order number': order['Order number'],
+                            'Order date': order.get('Order date', ''),
+                            "Buyer's name": order.get("Buyer's name", ''),
+                            'Delivery service': order.get('Delivery service', ''),
+                            'SKU': product['SKU'],
+                            'Quantity': product['Quantity']
+                        }
+                        orders.append(order_entry)
+
                 return orders
 
             orders = extract_orders_from_text(text)
@@ -556,6 +573,7 @@ def upload_pdfs_home24(request):
     else:
         # If GET request or no files uploaded, redirect back to the main upload page
         return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+
 
 
 
