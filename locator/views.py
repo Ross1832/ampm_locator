@@ -423,7 +423,8 @@ def upload_pdfs_home24(request):
                 # Split text into individual orders
                 order_texts = re.split(order_separator_regex, text)
                 for order_text in order_texts[1:]:  # Skip text before the first order separator
-                    order = {}
+                    # Common order details
+                    order_common = {}
 
                     # Helper function to get field value based on patterns
                     def get_field_value(text, patterns):
@@ -454,86 +455,73 @@ def upload_pdfs_home24(request):
                         r'Mode de livraison\s*:\s*(.*)',   # French
                         r'Verzendmethode:\s*(.*)',         # Dutch
                     ]
-                    sku_patterns = [
-                        r'Shop-Referenz:\s*(.*)',          # German
-                        r'Référence vendeur\s*:\s*(.*)',   # French
-                        r'Referentie shop:\s*(.*)',        # Dutch
-                    ]
-                    # Extract Order Number
+
+                    # Extract common order details
                     order_number = get_field_value(order_text, order_number_patterns)
                     if order_number:
-                        order['Order number'] = order_number
+                        order_common['Order number'] = order_number
                     else:
                         continue  # Skip if no order number found
 
-                    # Extract Order Date
                     order_date = get_field_value(order_text, order_date_patterns)
                     if order_date:
-                        order['Order date'] = order_date.strip()
+                        order_common['Order date'] = order_date.strip()
 
-                    # Extract Buyer's Name
                     buyer_name = get_field_value(order_text, buyer_name_patterns)
                     if buyer_name:
-                        order["Buyer's name"] = buyer_name.strip()
+                        order_common["Buyer's name"] = buyer_name.strip()
 
-                    # Extract Delivery Service
                     delivery_service = get_field_value(order_text, delivery_service_patterns)
                     if delivery_service:
-                        order['Delivery service'] = delivery_service.strip()
+                        order_common['Delivery service'] = delivery_service.strip()
 
                     # Now extract products within the order
-                    lines = order_text.split('\n')
+                    # Split the order text into product sections
+                    product_sections = re.split(r'Produktbeschreibung', order_text, flags=re.I)[1:]  # Skip text before the first product
+                    for product_text in product_sections:
+                        order = order_common.copy()
 
-                    # Define product name patterns
-                    product_name_patterns = [
-                        r'^Produktname:',      # German
-                        r'^Nom du produit:',   # French
-                        r'^Productnaam:',      # Dutch
-                    ]
+                        # Extract SKU
+                        sku_patterns = [
+                            r'Shop-Referenz:\s*(.*)',          # German
+                            r'Référence vendeur\s*:\s*(.*)',   # French
+                            r'Referentie shop:\s*(.*)',        # Dutch
+                        ]
+                        sku = get_field_value(product_text, sku_patterns)
+                        if sku:
+                            order['SKU'] = sku.strip()
+                        else:
+                            order['SKU'] = ''
 
-                    # Find indices where a product starts
-                    product_indices = []
-                    for i, line in enumerate(lines):
-                        for pattern in product_name_patterns:
-                            if re.match(pattern, line.strip()):
-                                product_indices.append(i)
+                        # Extract Quantity
+                        quantity_markers = [
+                            r'Menge',      # German
+                            r'Anzahl',     # German
+                            r'Qté',        # French
+                            r'Aant\.',     # Dutch
+                        ]
+                        quantity = None
+                        # Search for quantity within the product text
+                        for marker in quantity_markers:
+                            pattern = r'{}\s*(\d+)'.format(marker)
+                            match = re.search(pattern, product_text, re.I)
+                            if match:
+                                quantity = match.group(1).strip()
                                 break
+                        # If quantity not found in product, check at the end of order
+                        if not quantity:
+                            # Extract quantity at the end of the order
+                            lines = order_text.strip().split('\n')
+                            for i in range(len(lines) - 1):
+                                line = lines[i].strip()
+                                if any(qm.lower() == line.lower() for qm in ['Menge', 'Anzahl', 'Qté', 'Aant.']):
+                                    quantity_line = lines[i + 1].strip()
+                                    if quantity_line.isdigit():
+                                        quantity = quantity_line
+                                        break
+                        order['Quantity'] = quantity if quantity else '1'  # Default to 1 if not found
 
-                    if product_indices:
-                        # For each product, create a separate order dict
-                        for idx, start_idx in enumerate(product_indices):
-                            # The end index is the next product index or the end of lines
-                            end_idx = product_indices[idx + 1] if idx + 1 < len(product_indices) else len(lines)
-
-                            # Extract the product block
-                            product_block = '\n'.join(lines[start_idx:end_idx])
-
-                            # Extract SKU from the product_block
-                            product_sku = get_field_value(product_block, sku_patterns)
-
-                            # Extract Quantity
-                            quantity_patterns = [
-                                r'Anzahl\s*:\s*(\d+)',      # German
-                                r'Menge\s*:\s*(\d+)',       # German
-                                r'Qté\s*:\s*(\d+)',         # French
-                                r'Aant\.\s*:\s*(\d+)',      # Dutch
-                            ]
-                            quantity = get_field_value(product_block, quantity_patterns)
-                            if not quantity:
-                                quantity = '1'  # Default quantity to 1 if not found
-
-                            # Create a new order dict for this product
-                            product_order = order.copy()  # Copy common order fields
-                            product_order['SKU'] = product_sku.strip() if product_sku else ''
-                            product_order['Quantity'] = quantity
-                            # Append the product_order to orders list
-                            orders.append(product_order)
-                    else:
-                        # No products found, skip or handle accordingly
-                        print(f"No products found for order {order_number}")
-                        # Optionally, create a default order entry without SKU and quantity
-                        order['SKU'] = ''
-                        order['Quantity'] = ''
+                        # Append the order with the product
                         orders.append(order)
                 return orders
 
@@ -569,6 +557,7 @@ def upload_pdfs_home24(request):
     else:
         # If GET request or no files uploaded, redirect back to the main upload page
         return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+
 
 
 
