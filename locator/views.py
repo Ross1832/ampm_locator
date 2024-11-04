@@ -391,184 +391,160 @@ def aggregate_skus(request):
 
 #### home24
 
-def upload_pdfs_home24(request):
-    if request.method == 'POST' and request.FILES.getlist('pdf_files_home24'):
-        pdf_files = request.FILES.getlist('pdf_files_home24')
-        all_orders = []
+def extract_orders_from_text(text):
+    orders = []
+    # Define order separators for different languages
+    order_separators = [
+        'Lieferschein',        # German
+        'Bon de livraison',    # French
+        'Leveringsbon'         # Dutch
+    ]
+    # Create a regex pattern for order separators
+    order_separator_regex = r'(?i)(?:' + '|'.join(map(re.escape, order_separators)) + ')'
+    # Split text into individual orders
+    order_texts = re.split(order_separator_regex, text)
+    for order_text in order_texts[1:]:  # Skip text before the first order separator
+        # Extract order-level details
+        order = {}
 
-        for pdf_file in pdf_files:
-            # Save the uploaded file temporarily
-            temp_pdf_path = default_storage.save('temp/' + pdf_file.name, ContentFile(pdf_file.read()))
-            # Process the PDF file
-            text = ''
-            with pdfplumber.open(default_storage.path(temp_pdf_path)) as pdf:
-                for page in pdf.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + '\n'
-            # Delete the temporary file
-            default_storage.delete(temp_pdf_path)
+        # Helper function to get field value based on patterns
+        def get_field_value(text, patterns):
+            for pattern in patterns:
+                match = re.search(pattern, text, re.I)
+                if match:
+                    return match.group(1).strip()
+            return None
 
-            # Extract orders from text
-            def extract_orders_from_text(text):
-                orders = []
-                # Define order separators for different languages
-                order_separators = [
-                    'Lieferschein',        # German
-                    'Bon de livraison',    # French
-                    'Leveringsbon'         # Dutch
-                ]
-                # Create a regex pattern for order separators
-                order_separator_regex = r'(?i)(?:' + '|'.join(map(re.escape, order_separators)) + ')'
-                # Split text into individual orders
-                order_texts = re.split(order_separator_regex, text)
-                for order_text in order_texts[1:]:  # Skip text before the first order separator
-                    # Initialize order dictionary
-                    order = {}
+        # Define patterns for each field in different languages
+        order_number_patterns = [
+            r'Bestellnummer:\s*([A-Za-z0-9-]+)',          # German
+            r'Numéro de commande\s*:\s*([A-Za-z0-9-]+)',  # French
+            r'Bestelnummer:\s*([A-Za-z0-9-]+)',           # Dutch
+        ]
+        order_date_patterns = [
+            r'Bestelldatum:\s*([\d./-]+)',           # German
+            r'Date de commande\s*:\s*([\d./-]+)',    # French
+            r'Besteldatum:\s*([\d./-]+)',            # Dutch
+        ]
+        buyer_name_patterns = [
+            r'Name des Kunden:\s*(.*)',        # German
+            r'Nom de l\'acheteur\s*:\s*(.*)',  # French
+            r'Klantnaam:\s*(.*)',              # Dutch
+        ]
+        delivery_service_patterns = [
+            r'Versandmethode:\s*(.*)',         # German
+            r'Mode de livraison\s*:\s*(.*)',   # French
+            r'Verzendmethode:\s*(.*)',         # Dutch
+        ]
 
-                    # Helper function to get field value based on patterns
-                    def get_field_value(text, patterns):
-                        for pattern in patterns:
-                            match = re.search(pattern, text, re.I)
-                            if match:
-                                return match.group(1).strip()
-                        return None
+        # Extract Order Number
+        order_number = get_field_value(order_text, order_number_patterns)
+        if order_number:
+            order['Order number'] = order_number
+        else:
+            continue  # Skip if no order number found
 
-                    # Define patterns for each field in different languages
-                    order_number_patterns = [
-                        r'Bestellnummer:\s*([A-Za-z0-9-]+)',          # German
-                        r'Numéro de commande\s*:\s*([A-Za-z0-9-]+)',  # French
-                        r'Bestelnummer:\s*([A-Za-z0-9-]+)',           # Dutch
-                    ]
-                    order_date_patterns = [
-                        r'Bestelldatum:\s*([\d./-]+)',           # German
-                        r'Date de commande\s*:\s*([\d./-]+)',    # French
-                        r'Besteldatum:\s*([\d./-]+)',            # Dutch
-                    ]
-                    buyer_name_patterns = [
-                        r'Name des Kunden:\s*(.*)',        # German
-                        r'Nom de l\'acheteur\s*:\s*(.*)',  # French
-                        r'Klantnaam:\s*(.*)',              # Dutch
-                    ]
-                    delivery_service_patterns = [
-                        r'Versandmethode:\s*(.*)',         # German
-                        r'Mode de livraison\s*:\s*(.*)',   # French
-                        r'Verzendmethode:\s*(.*)',         # Dutch
-                    ]
+        # Extract Order Date
+        order_date = get_field_value(order_text, order_date_patterns)
+        if order_date:
+            order['Order date'] = order_date.strip()
 
-                    # Extract Order Number
-                    order_number = get_field_value(order_text, order_number_patterns)
-                    if order_number:
-                        order['Order number'] = order_number
-                    else:
-                        continue  # Skip if no order number found
+        # Extract Buyer's Name
+        buyer_name = get_field_value(order_text, buyer_name_patterns)
+        if buyer_name:
+            order["Buyer's name"] = buyer_name.strip()
 
-                    # Extract Order Date
-                    order_date = get_field_value(order_text, order_date_patterns)
-                    if order_date:
-                        order['Order date'] = order_date.strip()
+        # Extract Delivery Service
+        delivery_service = get_field_value(order_text, delivery_service_patterns)
+        if delivery_service:
+            order['Delivery service'] = delivery_service.strip()
 
-                    # Extract Buyer's Name
-                    buyer_name = get_field_value(order_text, buyer_name_patterns)
-                    if buyer_name:
-                        order["Buyer's name"] = buyer_name.strip()
+        # Now process products within the order_text
 
-                    # Extract Delivery Service
-                    delivery_service = get_field_value(order_text, delivery_service_patterns)
-                    if delivery_service:
-                        order['Delivery service'] = delivery_service.strip()
+        # Define product markers
+        product_markers = [
+            r'Produktname:',          # German
+            r'Nom du produit:',       # French
+            r'Productnaam:',          # Dutch
+        ]
 
-                    # Now, extract products
+        # Create regex pattern for product markers
+        product_marker_regex = r'(?i)(?:' + '|'.join(product_markers) + ')'
 
-                    # Find the start of 'Produktbeschreibung'
-                    product_description_pattern = r'Produktbeschreibung'
-                    product_description_match = re.search(product_description_pattern, order_text, re.I)
-                    if product_description_match:
-                        product_text_start = product_description_match.end()
-                        product_text = order_text[product_text_start:]
+        # Find all product markers in the order_text
+        product_matches = list(re.finditer(product_marker_regex, order_text))
 
-                        # Now, split the product_text into individual products based on 'Produktname'
-                        product_sections = re.split(r'Produktname:\s*', product_text)
-                        # The first split part before the first 'Produktname' is not a product, so skip it
-                        product_sections = product_sections[1:]
+        if not product_matches:
+            # No products found
+            continue
 
-                        multiple_products = len(product_sections) > 1
+        # Append an artificial end position for the last product
+        product_positions = [match.start() for match in product_matches] + [len(order_text)]
 
-                        # For single product, try to find 'Menge' in the order_text
-                        menge = ''
-                        if not multiple_products:
-                            menge_match = re.search(r'Menge\s+(\d+)', order_text, re.I)
-                            if menge_match:
-                                menge = menge_match.group(1)
+        # Loop over products
+        for i in range(len(product_matches)):
+            start_pos = product_positions[i]
+            end_pos = product_positions[i+1]
 
-                        for product_section in product_sections:
-                            # Since 'Produktname:' was removed during split, add it back
-                            product_section = 'Produktname: ' + product_section
+            product_text = order_text[start_pos:end_pos]
 
-                            product = {}
-                            # Extract SKU
-                            sku_match = re.search(r'Shop-Referenz:\s*(\S+)', product_section, re.I)
-                            if sku_match:
-                                sku = sku_match.group(1).strip()
-                                quantity = ''
-                                # For multiple products, extract last digit as quantity if SKU ends with digit
-                                if multiple_products and sku[-1].isdigit():
-                                    quantity = sku[-1]
-                                    sku = sku[:-1]
-                                else:
-                                    quantity = menge  # For single product
-                                product['SKU'] = sku
-                                product['Quantity'] = quantity
-                            else:
-                                product['SKU'] = ''
-                                product['Quantity'] = menge if not multiple_products else ''
+            product_order = order.copy()  # Copy order-level details
 
-                            # Create order dictionary for this product
-                            order_product = order.copy()
-                            order_product['SKU'] = product['SKU']
-                            order_product['Quantity'] = product['Quantity']
-                            # Debugging: Print the order product dictionary
-                            print(f"Order product details: {order_product}")
-                            orders.append(order_product)
-                    else:
-                        # Could not find 'Produktbeschreibung', skip
-                        print("Could not find 'Produktbeschreibung' in order text")
-                        continue
+            # Now extract SKU and Quantity for each product
 
-                return orders
+            # Define patterns for SKU
+            sku_patterns = [
+                r'Shop-Referenz:\s*(.*)',          # German
+                r'Référence vendeur\s*:\s*(.*)',   # French
+                r'Referentie shop:\s*(.*)',        # Dutch
+            ]
 
-            orders = extract_orders_from_text(text)
-            if not orders:
-                print(f"No orders found in {pdf_file.name}")
-            all_orders.extend(orders)
-        if not all_orders:
-            return HttpResponse('No orders were extracted. Please check the PDF files and the extraction logic.')
+            # Extract SKU
+            sku = get_field_value(product_text, sku_patterns)
+            if sku:
+                product_order['SKU'] = sku.strip()
+            else:
+                product_order['SKU'] = ''
 
-        # Create DataFrame and write to Excel
-        df = pd.DataFrame(all_orders)
-        # Reorder columns as specified
-        df = df[['Order number', 'Order date', "Buyer's name", 'SKU', 'Quantity', 'Delivery service']]
+            # Extract Quantity
+            # Default quantity to 1
+            quantity = '1'
 
-        # Debugging: Print the DataFrame
-        print(df)
+            quantity_markers = [
+                r'Anzahl',      # German
+                r'Menge',       # German
+                r'Qté',         # French
+                r'Aant\.',      # Dutch
+            ]
 
-        # Save the Excel file to an in-memory stream
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False)
-        output.seek(0)
+            # Split product_text into lines
+            lines = product_text.split('\n')
+            for idx, line in enumerate(lines):
+                line_stripped = line.strip()
+                for marker in quantity_markers:
+                    if re.search(r'(?i)\b' + re.escape(marker) + r'\b', line_stripped):
+                        # Now scan the next lines to find a number
+                        for next_line in lines[idx + 1:]:
+                            next_line_stripped = next_line.strip()
+                            if next_line_stripped:
+                                # Use regex to find a number
+                                match = re.search(r'(\d+)', next_line_stripped)
+                                if match:
+                                    quantity = match.group(1)
+                                    print(f"Extracted quantity for SKU {sku}: {quantity}")
+                                    break
+                        break  # Break the marker loop after processing the marker
+                if quantity != '1':  # If quantity was found and changed from default
+                    break  # Break the line loop if quantity is found
 
-        # Prepare response to download the file
-        response = HttpResponse(
-            output.getvalue(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename=home24_orders_{uuid.uuid4().hex}.xlsx'
+            # Assign quantity to product_order
+            product_order['Quantity'] = quantity
 
-        return response
-    else:
-        # If GET request or no files uploaded, redirect back to the main upload page
-        return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+            # Append product_order to orders list
+            orders.append(product_order)
+
+    return orders
+
 
 
 
