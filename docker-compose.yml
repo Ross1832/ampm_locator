@@ -11,6 +11,8 @@ services:
   web:
     build: .
     command: gunicorn core.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - media_data:/app/media
     environment:
       - DATABASE_NAME=${DATABASE_NAME}
       - DATABASE_USER=${DATABASE_USER}
