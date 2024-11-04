@@ -406,8 +406,8 @@ def upload_pdfs_home24(request):
                     page_text = page.extract_text()
                     if page_text:
                         text += page_text + '\n'
-                # Delete the temporary file
-                default_storage.delete(temp_pdf_path)
+            # Delete the temporary file
+            default_storage.delete(temp_pdf_path)
 
             # Extract orders from text
             def extract_orders_from_text(text):
@@ -454,6 +454,17 @@ def upload_pdfs_home24(request):
                         r'Mode de livraison\s*:\s*(.*)',   # French
                         r'Verzendmethode:\s*(.*)',         # Dutch
                     ]
+                    sku_patterns = [
+                        r'Shop-Referenz:\s*(.*)',          # German
+                        r'Référence vendeur\s*:\s*(.*)',   # French
+                        r'Referentie shop:\s*(.*)',        # Dutch
+                    ]
+                    quantity_markers = [
+                        r'Anzahl',      # German
+                        r'Menge',       # German
+                        r'Qté',         # French
+                        r'Aant\.',      # Dutch
+                    ]
 
                     # Extract Order Number
                     order_number = get_field_value(order_text, order_number_patterns)
@@ -477,68 +488,62 @@ def upload_pdfs_home24(request):
                     if delivery_service:
                         order['Delivery service'] = delivery_service.strip()
 
-                    # Now extract products
-                    lines = order_text.split('\n')
-                    products = []
-                    quantity_markers = [
-                        r'Anzahl',      # German
-                        r'Menge',       # German
-                        r'Qté',         # French
-                        r'Aant\.',      # Dutch
-                    ]
+                    # Now, extract items
+                    # Get the text after 'Produktbeschreibung'
+                    items_section = order_text.split('Produktbeschreibung')[-1]
+                    # Split into items based on 'Produktname:'
+                    item_texts = items_section.split('Produktname:')[1:]  # Skip the first part before 'Produktname:'
 
-                    current_product = {}
-                    quantity = None
-
-                    for i, line in enumerate(lines):
-                        line = line.strip()
-                        # Check for SKU line
-                        if line.startswith('Shop-Referenz:'):
-                            sku = line.split('Shop-Referenz:')[1].strip()
-                            # Check if SKU ends with a digit (quantity appended)
-                            if sku and sku[-1].isdigit():
-                                quantity = sku[-1]
-                                sku = sku[:-1]
-                            else:
-                                quantity = ''
-                            current_product = {
-                                'SKU': sku,
-                                'Quantity': quantity
-                            }
-                            products.append(current_product)
-                        else:
-                            # Check for quantity markers
-                            for marker in quantity_markers:
-                                if re.search(r'(?i)\b' + re.escape(marker) + r'\b', line):
-                                    # Now scan the next lines to find a number
-                                    for next_line in lines[i + 1:]:
-                                        next_line = next_line.strip()
-                                        if next_line:
-                                            match = re.search(r'(\d+)', next_line)
-                                            if match:
-                                                quantity = match.group(1)
-                                                # Assign quantity to last product
-                                                if products:
-                                                    products[-1]['Quantity'] = quantity
-                                                break
-                                    break
-
-                    # If no products found, skip this order
-                    if not products:
+                    # If no items found, continue
+                    if not item_texts:
                         continue
 
-                    # For each product, create an order entry
-                    for product in products:
-                        order_entry = {
-                            'Order number': order['Order number'],
-                            'Order date': order.get('Order date', ''),
-                            "Buyer's name": order.get("Buyer's name", ''),
-                            'Delivery service': order.get('Delivery service', ''),
-                            'SKU': product['SKU'],
-                            'Quantity': product['Quantity']
-                        }
-                        orders.append(order_entry)
+                    for item_text in item_texts:
+                        item_order = order.copy()
 
+                        # Extract SKU
+                        sku = get_field_value(item_text, sku_patterns)
+                        if sku:
+                            sku = sku.strip()
+                            # Check if SKU ends with digit(s), which might be the quantity
+                            match = re.match(r'(.*?)(\d+)$', sku)
+                            if match and len(item_texts) > 1:
+                                sku_only = match.group(1)
+                                quantity = match.group(2)
+                            else:
+                                sku_only = sku
+                                quantity = ''
+                        else:
+                            sku_only = ''
+                            quantity = ''
+
+                        item_order['SKU'] = sku_only
+                        item_order['Quantity'] = quantity
+
+                        # If quantity is still empty, try to extract from 'Menge' markers
+                        if not quantity:
+                            # Search for quantity markers in the item_text
+                            lines = item_text.split('\n')
+                            for i, line in enumerate(lines):
+                                line_stripped = line.strip()
+                                for marker in quantity_markers:
+                                    if re.search(r'(?i)\b' + re.escape(marker) + r'\b', line_stripped):
+                                        # Now scan the next lines to find a number
+                                        for next_line in lines[i + 1:]:
+                                            next_line_stripped = next_line.strip()
+                                            if next_line_stripped:
+                                                # Use regex to find a number in the line
+                                                match = re.search(r'(\d+)', next_line_stripped)
+                                                if match:
+                                                    quantity = match.group(1)
+                                                    break
+                                        break  # Break the marker loop after processing the marker
+                                if quantity:
+                                    break  # Break the line loop if quantity is found
+                            item_order['Quantity'] = quantity if quantity else ''
+
+                        # Append item_order to orders
+                        orders.append(item_order)
                 return orders
 
             orders = extract_orders_from_text(text)
@@ -573,6 +578,7 @@ def upload_pdfs_home24(request):
     else:
         # If GET request or no files uploaded, redirect back to the main upload page
         return redirect('upload_and_download')  # Ensure 'upload_and_download' is the correct URL name
+
 
 
 
